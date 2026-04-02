@@ -1,0 +1,28 @@
+#Security: Ignore the environment file containing database passwords
+
+.env
+
+#Python: Ignore compiled files and cache
+
+pycache/
+*.py[cod]
+*$py.class
+
+#Environments: Ignore virtual environment folders
+
+.venv/
+env/
+venv/
+ENV/
+
+#OS-specific: Ignore system junk
+
+.DS_Store
+Thumbs.db
+
+#Project-specific: Ignore temporary health check or test scripts if needed
+
+system_health_check.py
+
+schema_cache.jso
+saved_reports.json

@@ -1,0 +1,854 @@
+{
+  "hr": {
+    "db_key": "hr",
+    "name": "HR Analytics",
+    "type": "postgresql",
+    "domain": "HR",
+    "description": "Employee HR data \u2014 salaries, departments, hire dates",
+    "tables": {
+      "hr_employees": {
+        "columns": [
+          {
+            "name": "emp_id",
+            "type": "INTEGER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "name",
+            "type": "VARCHAR(100)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "department",
+            "type": "VARCHAR(50)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "salary",
+            "type": "NUMERIC(10, 2)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "hire_date",
+            "type": "DATE",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      },
+      "hr_feedback": {
+        "columns": [
+          {
+            "name": "feedback_id",
+            "type": "INTEGER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "emp_id",
+            "type": "INTEGER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "feedback_text",
+            "type": "TEXT",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "embedding",
+            "type": "NULL",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [
+          {
+            "columns": [
+              "emp_id"
+            ],
+            "references": "hr_employees.['emp_id']"
+          }
+        ],
+        "row_count": null
+      }
+    },
+    "views": [],
+    "procedures": [
+      "array_to_halfvec",
+      "array_to_halfvec",
+      "array_to_halfvec",
+      "array_to_halfvec",
+      "array_to_sparsevec",
+      "array_to_sparsevec",
+      "array_to_sparsevec",
+      "array_to_sparsevec",
+      "array_to_vector",
+      "array_to_vector",
+      "array_to_vector",
+      "array_to_vector",
+      "binary_quantize",
+      "binary_quantize",
+      "cosine_distance",
+      "cosine_distance",
+      "cosine_distance",
+      "halfvec",
+      "halfvec_accum",
+      "halfvec_add",
+      "halfvec_avg",
+      "halfvec_cmp",
+      "halfvec_combine",
+      "halfvec_concat",
+      "halfvec_eq",
+      "halfvec_ge",
+      "halfvec_gt",
+      "halfvec_in",
+      "halfvec_l2_squared_distance",
+      "halfvec_le",
+      "halfvec_lt",
+      "halfvec_mul",
+      "halfvec_ne",
+      "halfvec_negative_inner_product",
+      "halfvec_out",
+      "halfvec_recv",
+      "halfvec_send",
+      "halfvec_spherical_distance",
+      "halfvec_sub",
+      "halfvec_to_float4",
+      "halfvec_to_sparsevec",
+      "halfvec_to_vector",
+      "halfvec_typmod_in",
+      "hamming_distance",
+      "hnsw_bit_support",
+      "hnsw_halfvec_support",
+      "hnsw_sparsevec_support",
+      "hnswhandler",
+      "inner_product",
+      "inner_product",
+      "inner_product",
+      "ivfflat_bit_support",
+      "ivfflat_halfvec_support",
+      "ivfflathandler",
+      "jaccard_distance",
+      "l1_distance",
+      "l1_distance",
+      "l1_distance",
+      "l2_distance",
+      "l2_distance",
+      "l2_distance",
+      "l2_norm",
+      "l2_norm",
+      "l2_normalize",
+      "l2_normalize",
+      "l2_normalize",
+      "sparsevec",
+      "sparsevec_cmp",
+      "sparsevec_eq",
+      "sparsevec_ge",
+      "sparsevec_gt",
+      "sparsevec_in",
+      "sparsevec_l2_squared_distance",
+      "sparsevec_le",
+      "sparsevec_lt",
+      "sparsevec_ne",
+      "sparsevec_negative_inner_product",
+      "sparsevec_out",
+      "sparsevec_recv",
+      "sparsevec_send",
+      "sparsevec_to_halfvec",
+      "sparsevec_to_vector",
+      "sparsevec_typmod_in",
+      "subvector",
+      "subvector",
+      "vector",
+      "vector_accum",
+      "vector_add",
+      "vector_avg",
+      "vector_cmp",
+      "vector_combine",
+      "vector_concat",
+      "vector_dims",
+      "vector_dims",
+      "vector_eq",
+      "vector_ge",
+      "vector_gt",
+      "vector_in",
+      "vector_l2_squared_distance",
+      "vector_le",
+      "vector_lt",
+      "vector_mul",
+      "vector_ne",
+      "vector_negative_inner_product",
+      "vector_norm",
+      "vector_out",
+      "vector_recv",
+      "vector_send",
+      "vector_spherical_distance",
+      "vector_sub",
+      "vector_to_float4",
+      "vector_to_halfvec",
+      "vector_to_sparsevec",
+      "vector_typmod_in"
+    ],
+    "discovered_at": "2026-03-30 18:59:24",
+    "error": null
+  },
+  "claims": {
+    "db_key": "claims",
+    "name": "Healthcare Claims",
+    "type": "mssql",
+    "domain": "CLAIMS",
+    "description": "Healthcare claims \u2014 billing, providers, approvals, denials",
+    "tables": {
+      "ai_query_cache": {
+        "columns": [
+          {
+            "name": "id",
+            "type": "INTEGER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "user_question",
+            "type": "NVARCHAR(500) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "sql_code",
+            "type": "NVARCHAR COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "question_embedding",
+            "type": "NULL",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "created_at",
+            "type": "DATETIME",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      },
+      "Claims": {
+        "columns": [
+          {
+            "name": "ClaimID",
+            "type": "INTEGER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "MemberID",
+            "type": "VARCHAR(20) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ServiceDate",
+            "type": "DATE",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ProviderName",
+            "type": "VARCHAR(100) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "DiagnosisCode",
+            "type": "VARCHAR(10) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ProcedureCode",
+            "type": "VARCHAR(10) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "BilledAmount",
+            "type": "DECIMAL(10, 2)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "PaidAmount",
+            "type": "DECIMAL(10, 2)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ClaimStatus",
+            "type": "VARCHAR(20) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      }
+    },
+    "views": [],
+    "procedures": [],
+    "discovered_at": "2026-03-30 18:59:42",
+    "error": null
+  },
+  "mysql_app": {
+    "db_key": "mysql_app",
+    "name": "MySQL Application DB",
+    "type": "mysql",
+    "domain": "",
+    "description": "MySQL transactional database",
+    "tables": {},
+    "views": [],
+    "procedures": [],
+    "discovered_at": "2026-03-30 17:37:05",
+    "error": "No module named 'pymysql'"
+  },
+  "oracle_erp": {
+    "db_key": "oracle_erp",
+    "name": "Oracle Sales CRM",
+    "type": "oracle",
+    "domain": "SALES",
+    "description": "Sales CRM \u2014 customers, orders, products, reps, revenue, activities",
+    "tables": {
+      "regions": {
+        "columns": [
+          {
+            "name": "region_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "region_name",
+            "type": "VARCHAR(50)",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "country",
+            "type": "VARCHAR(50)",
+            "nullable": false,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      },
+      "sales_reps": {
+        "columns": [
+          {
+            "name": "rep_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "emp_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "rep_name",
+            "type": "VARCHAR(100)",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "region_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "hire_date",
+            "type": "DATE",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "quota",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "active",
+            "type": "CHAR(1)",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [
+          {
+            "columns": [
+              "region_id"
+            ],
+            "references": "regions.['region_id']"
+          }
+        ],
+        "row_count": null
+      },
+      "customers": {
+        "columns": [
+          {
+            "name": "customer_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "company_name",
+            "type": "VARCHAR(150)",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "contact_name",
+            "type": "VARCHAR(100)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "email",
+            "type": "VARCHAR(150)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "phone",
+            "type": "VARCHAR(30)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "city",
+            "type": "VARCHAR(80)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "state",
+            "type": "VARCHAR(50)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "country",
+            "type": "VARCHAR(50)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "segment",
+            "type": "VARCHAR(30)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "created_date",
+            "type": "DATE",
+            "nullable": false,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      },
+      "products": {
+        "columns": [
+          {
+            "name": "product_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "product_name",
+            "type": "VARCHAR(150)",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "category",
+            "type": "VARCHAR(60)",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "unit_price",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "cost",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "active",
+            "type": "CHAR(1)",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      },
+      "orders": {
+        "columns": [
+          {
+            "name": "order_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "customer_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "rep_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "order_date",
+            "type": "DATE",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "close_date",
+            "type": "DATE",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "status",
+            "type": "VARCHAR(20)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "deal_value",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "region_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [
+          {
+            "columns": [
+              "customer_id"
+            ],
+            "references": "customers.['customer_id']"
+          },
+          {
+            "columns": [
+              "rep_id"
+            ],
+            "references": "sales_reps.['rep_id']"
+          },
+          {
+            "columns": [
+              "region_id"
+            ],
+            "references": "regions.['region_id']"
+          }
+        ],
+        "row_count": null
+      },
+      "order_items": {
+        "columns": [
+          {
+            "name": "item_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "order_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "product_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "quantity",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "unit_price",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "discount_pct",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "line_total",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [
+          {
+            "columns": [
+              "order_id"
+            ],
+            "references": "orders.['order_id']"
+          },
+          {
+            "columns": [
+              "product_id"
+            ],
+            "references": "products.['product_id']"
+          }
+        ],
+        "row_count": null
+      },
+      "activities": {
+        "columns": [
+          {
+            "name": "activity_id",
+            "type": "NUMBER",
+            "nullable": false,
+            "primary_key": true
+          },
+          {
+            "name": "order_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "rep_id",
+            "type": "NUMBER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "activity_type",
+            "type": "VARCHAR(30)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "activity_date",
+            "type": "DATE",
+            "nullable": false,
+            "primary_key": false
+          },
+          {
+            "name": "notes",
+            "type": "VARCHAR(500)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "outcome",
+            "type": "VARCHAR(20)",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [
+          {
+            "columns": [
+              "order_id"
+            ],
+            "references": "orders.['order_id']"
+          },
+          {
+            "columns": [
+              "rep_id"
+            ],
+            "references": "sales_reps.['rep_id']"
+          }
+        ],
+        "row_count": null
+      }
+    },
+    "views": [],
+    "procedures": [],
+    "discovered_at": "2026-03-30 18:59:55",
+    "error": null
+  },
+  "snowflake_dw": {
+    "db_key": "snowflake_dw",
+    "name": "Snowflake Data Warehouse",
+    "type": "snowflake",
+    "domain": "",
+    "description": "Snowflake cloud data warehouse",
+    "tables": {},
+    "views": [],
+    "procedures": [],
+    "discovered_at": "2026-03-30 17:37:05",
+    "error": "Can't load plugin: sqlalchemy.dialects:snowflake"
+  },
+  "sqlite_local": {
+    "db_key": "sqlite_local",
+    "name": "SQLite (Local File)",
+    "type": "sqlite",
+    "domain": "",
+    "description": "Lightweight local SQLite database",
+    "tables": {},
+    "views": [],
+    "procedures": [],
+    "discovered_at": "2026-03-30 17:37:07",
+    "error": null
+  },
+  "azure_sql": {
+    "db_key": "azure_sql",
+    "name": "Azure SQL (Claims)",
+    "type": "mssql",
+    "domain": "AZURE_CLAIMS",
+    "description": "Azure SQL cloud database \u2014 Claims and ProviderClaimSummary tables",
+    "tables": {
+      "Claims": {
+        "columns": [
+          {
+            "name": "ClaimID",
+            "type": "INTEGER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "MemberID",
+            "type": "VARCHAR(20) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ServiceDate",
+            "type": "DATE",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ProviderName",
+            "type": "VARCHAR(100) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "DiagnosisCode",
+            "type": "VARCHAR(10) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ProcedureCode",
+            "type": "VARCHAR(10) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "BilledAmount",
+            "type": "DECIMAL(10, 2)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "PaidAmount",
+            "type": "DECIMAL(10, 2)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "ClaimStatus",
+            "type": "VARCHAR(20) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      },
+      "ProviderClaimSummary": {
+        "columns": [
+          {
+            "name": "ProviderName",
+            "type": "VARCHAR(100) COLLATE \"SQL_Latin1_General_CP1_CI_AS\"",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "TotalClaimsProcessed",
+            "type": "INTEGER",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "TotalBilled",
+            "type": "DECIMAL(38, 2)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "TotalPaid",
+            "type": "DECIMAL(38, 2)",
+            "nullable": true,
+            "primary_key": false
+          },
+          {
+            "name": "TotalPatientResponsibility",
+            "type": "DECIMAL(38, 2)",
+            "nullable": true,
+            "primary_key": false
+          }
+        ],
+        "foreign_keys": [],
+        "row_count": null
+      }
+    },
+    "views": [],
+    "procedures": [
+      "sp_SummarizeProviderClaims"
+    ],
+    "discovered_at": "2026-04-01 15:48:50",
+    "error": null
+  }
+}

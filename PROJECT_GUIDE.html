@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Agent BI Engine — Project Guide</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f8f9fa; color: #202124; line-height: 1.6; }
+
+header { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); color: white; padding: 44px 52px; }
+header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.5px; }
+header p { margin-top: 8px; opacity: 0.85; font-size: 1.05rem; }
+.badge { display: inline-block; background: rgba(255,255,255,0.18); border-radius: 20px; padding: 3px 13px; font-size: 0.78rem; margin-top: 12px; margin-right: 6px; font-weight: 500; }
+
+nav { background: #fff; border-bottom: 1px solid #e8eaed; padding: 0 52px; display: flex; gap: 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+nav a { display: block; padding: 14px 18px; font-size: 0.85rem; font-weight: 600; color: #5f6368; text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; }
+nav a:hover { color: #1a73e8; border-bottom-color: #1a73e8; }
+
+main { max-width: 1120px; margin: 0 auto; padding: 44px 24px 60px; }
+section { margin-bottom: 60px; }
+h2 { font-size: 1.5rem; font-weight: 800; color: #1a73e8; margin-bottom: 6px; padding-left: 16px; border-left: 5px solid #1a73e8; }
+.section-sub { color: #5f6368; font-size: 0.9rem; margin-bottom: 22px; padding-left: 21px; }
+h3 { font-size: 1.05rem; font-weight: 700; margin: 18px 0 6px; color: #202124; }
+p  { color: #3c4043; margin-bottom: 10px; font-size: 0.92rem; }
+code { font-family: 'Consolas', 'Courier New', monospace; background: #f1f3f4; padding: 1px 6px; border-radius: 4px; font-size: 0.85rem; color: #c5221f; }
+pre { background: #202124; color: #e8eaed; border-radius: 10px; padding: 18px 22px; font-size: 0.82rem; overflow-x: auto; margin: 10px 0; line-height: 1.7; }
+pre .c  { color: #9aa0a6; } /* comment */
+pre .k  { color: #89b4fa; } /* keyword */
+pre .s  { color: #a6e3a1; } /* string */
+pre .n  { color: #f38ba8; } /* number */
+pre .f  { color: #cba6f7; } /* function */
+
+/* CHIPS */
+.chip { display: inline-block; border-radius: 20px; padding: 2px 10px; font-size: 0.75rem; font-weight: 600; }
+.chip-green  { background: #e6f4ea; color: #137333; }
+.chip-blue   { background: #e8f0fe; color: #1a73e8; }
+.chip-orange { background: #fef3e2; color: #b45309; }
+.chip-red    { background: #fce8e6; color: #b31412; }
+.chip-purple { background: #f3e8fd; color: #7b1fa2; }
+.chip-grey   { background: #f1f3f4; color: #5f6368; }
+
+/* FILE MAP */
+.file-tree { font-family: 'Consolas', monospace; background: #202124; color: #e8eaed; border-radius: 12px; padding: 24px 28px; font-size: 0.88rem; line-height: 2; }
+.ft-entry  { color: #89b4fa; }
+.ft-file   { color: #a6e3a1; }
+.ft-desc   { color: #9aa0a6; font-size: 0.78rem; }
+.ft-legacy { color: #f38ba8; text-decoration: line-through; }
+.ft-config { color: #f9e2af; }
+.ft-auto   { color: #cba6f7; }
+
+/* FILE CARD GRID */
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; }
+.file-card { background: #fff; border: 1px solid #dadce0; border-radius: 12px; padding: 20px; transition: box-shadow 0.2s; }
+.file-card:hover { box-shadow: 0 4px 16px rgba(26,115,232,0.1); }
+.file-card .fname { font-family: 'Consolas', monospace; font-size: 0.88rem; background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 8px; }
+.file-card .num   { font-size: 0.72rem; font-weight: 800; color: #9aa0a6; margin-bottom: 4px; }
+.file-card h3 { font-size: 0.95rem; margin-bottom: 6px; }
+.file-card p  { font-size: 0.82rem; color: #5f6368; }
+
+/* QUERY FLOW */
+.flow-path { margin: 24px 0; }
+.flow-path h3 { font-size: 0.95rem; font-weight: 700; color: #fff; background: #1a73e8; display: inline-block; padding: 4px 14px; border-radius: 20px; margin-bottom: 14px; }
+.flow-path.memory h3 { background: #137333; }
+.flow-path.federated h3 { background: #7b1fa2; }
+.flow-path.cascade h3 { background: #b45309; }
+.flow-path.rewrite h3 { background: #0d47a1; }
+
+.flow-steps { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; }
+.fs { background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 14px 16px; min-width: 130px; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.04); position: relative; }
+.fs .num { width: 24px; height: 24px; background: #1a73e8; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem; margin-bottom: 6px; }
+.flow-path.memory   .fs .num { background: #137333; }
+.flow-path.federated .fs .num { background: #7b1fa2; }
+.flow-path.cascade  .fs .num { background: #b45309; }
+.flow-path.rewrite  .fs .num { background: #0d47a1; }
+.fs .label { font-size: 0.8rem; font-weight: 700; color: #202124; }
+.fs .sub   { font-size: 0.72rem; color: #5f6368; margin-top: 4px; }
+.fs .ex    { font-size: 0.72rem; color: #1a73e8; font-style: italic; margin-top: 4px; background: #f8f9fa; padding: 3px 6px; border-radius: 4px; }
+.arr { display: flex; align-items: center; padding: 0 4px; color: #9aa0a6; font-size: 1.2rem; }
+.deviation { background: #fff8e1; border: 1px dashed #f9ab00; border-radius: 8px; padding: 10px 14px; margin: 8px 0 0 20px; font-size: 0.8rem; color: #b45309; }
+.deviation strong { display: block; margin-bottom: 3px; color: #b45309; }
+
+/* VECTOR SECTION */
+.vector-analogy { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+.analogy-box { background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 18px; }
+.analogy-box h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 8px; }
+.analogy-box p  { font-size: 0.82rem; color: #5f6368; margin: 0; }
+
+.similarity-bar { margin: 10px 0; }
+.similarity-bar .label { font-size: 0.8rem; color: #3c4043; margin-bottom: 3px; display: flex; justify-content: space-between; }
+.similarity-bar .bar { height: 10px; border-radius: 6px; background: #e8eaed; overflow: hidden; }
+.similarity-bar .fill { height: 100%; border-radius: 6px; }
+.fill-high { background: #137333; }
+.fill-med  { background: #f9ab00; }
+.fill-low  { background: #ea4335; }
+
+.evolution-steps { display: flex; gap: 0; align-items: stretch; margin: 16px 0; }
+.evo-step { flex: 1; background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 16px; text-align: center; }
+.evo-step .era { font-size: 0.72rem; font-weight: 700; color: #9aa0a6; text-transform: uppercase; margin-bottom: 6px; }
+.evo-step h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
+.evo-step p  { font-size: 0.78rem; color: #5f6368; margin: 0; }
+.evo-step.current { border-color: #1a73e8; background: #f0f6ff; }
+.evo-step.current h4 { color: #1a73e8; }
+.evo-arrow { display: flex; align-items: center; padding: 0 8px; color: #9aa0a6; font-size: 1.5rem; }
+
+/* TABLE */
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+th { background: #1a73e8; color: white; padding: 10px 14px; text-align: left; font-weight: 600; }
+td { padding: 9px 14px; border-bottom: 1px solid #f1f3f4; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f8f9fa; }
+
+/* INFO BOXES */
+.info-box { border-radius: 10px; padding: 14px 18px; margin: 12px 0; font-size: 0.85rem; }
+.info-blue   { background: #e8f0fe; border-left: 4px solid #1a73e8; color: #174ea6; }
+.info-green  { background: #e6f4ea; border-left: 4px solid #34a853; color: #137333; }
+.info-orange { background: #fef3e2; border-left: 4px solid #f9ab00; color: #b45309; }
+.info-red    { background: #fce8e6; border-left: 4px solid #ea4335; color: #b31412; }
+
+footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; border-top: 1px solid #e8eaed; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Multi-Agent BI Engine — Project Guide</h1>
+  <p>Your complete reference: every file, every flow, how the AI memory works, and how it all fits together</p>
+  <span class="badge">📅 April 2026</span>
+  <span class="badge">🐍 Python + Streamlit</span>
+  <span class="badge">🖥️ Windows 11 · RTX 3060 12GB · Ollama</span>
+  <span class="badge">4 Databases · 7 AI Models</span>
+</header>
+
+<nav>
+  <a href="#filemap">① File Map</a>
+  <a href="#files">② File Guide</a>
+  <a href="#queryflow">③ Query Flow</a>
+  <a href="#vectors">④ Vector Memory</a>
+  <a href="#models">⑤ AI Models</a>
+  <a href="#features">⑥ New Features</a>
+  <a href="#improvements">⑦ All Changes</a>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="filemap">
+<h2>① File Map — Every File and How They Connect</h2>
+<p class="section-sub">A numbered map of all files in the project, showing what each one is and how it relates to the others.</p>
+
+<div class="file-tree">
+<div><span style="color:#f9e2af;font-weight:700;">sirish_ai/</span>  <span class="ft-desc">← Your project folder</span></div>
+<div>&nbsp;</div>
+<div><span class="ft-entry">── 1. app.py</span>  <span class="ft-desc">← START HERE. Streamlit entry point. Runs on port 8502.</span></div>
+<div><span style="color:#9aa0a6">   │    Calls ──► bi_dashboard.py  (the main AI page)</span></div>
+<div><span style="color:#9aa0a6">   │    Calls ──► pages/1_Connection_Manager.py  (settings page)</span></div>
+<div>&nbsp;</div>
+<div><span class="ft-entry">── 2. bi_dashboard.py</span>  <span class="ft-desc">← The brain of the app. All AI logic lives here.</span></div>
+<div><span style="color:#9aa0a6">   │    Uses  ──► db_connector.py   (to run SQL queries)</span></div>
+<div><span style="color:#9aa0a6">   │    Reads  ──► schema_cache.json (to know your table structures)</span></div>
+<div><span style="color:#9aa0a6">   │    Reads  ──► .env              (for API keys)</span></div>
+<div><span style="color:#9aa0a6">   │    Calls  ──► Ollama  (local GPU models on your PC)</span></div>
+<div><span style="color:#9aa0a6">   │    Calls  ──► Anthropic API (Claude)</span></div>
+<div><span style="color:#9aa0a6">   │    Calls  ──► Google Gemini API</span></div>
+<div>&nbsp;</div>
+<div><span class="ft-entry">── 3. db_connector.py</span>  <span class="ft-desc">← Universal DB engine. Used by both dashboard and Connection Manager.</span></div>
+<div><span style="color:#9aa0a6">   │    Reads  ──► db_registry.yaml  (to know which DBs exist)</span></div>
+<div><span style="color:#9aa0a6">   │    Writes ──► schema_cache.json (when schema is discovered)</span></div>
+<div>&nbsp;</div>
+<div><span class="ft-config">── 4. db_registry.yaml</span>  <span class="ft-desc">← Config file. Add/edit databases here. No Python needed.</span></div>
+<div><span class="ft-config">── 5. .env</span>            <span class="ft-desc">← Secrets file. Passwords + API keys. Never share this.</span></div>
+<div><span class="ft-auto">── 6. schema_cache.json</span><span class="ft-desc">← Auto-generated. Created by "Discover Schema" in Connection Manager.</span></div>
+<div>&nbsp;</div>
+<div><span class="ft-entry">── 7. pages/</span></div>
+<div><span class="ft-entry">      └── 7.1 1_Connection_Manager.py</span>  <span class="ft-desc">← DB settings page (test, discover, add connections)</span></div>
+<div><span style="color:#9aa0a6">             Uses  ──► db_connector.py</span></div>
+<div>&nbsp;</div>
+<div><span class="ft-config">── 8. requirements.txt</span>   <span class="ft-desc">← List of all Python packages. Run: pip install -r requirements.txt</span></div>
+<div><span class="ft-config">── 9. start_dashboard.bat</span> <span class="ft-desc">← Windows launcher: starts Streamlit + ngrok tunnel</span></div>
+<div><span class="ft-config">── 10. healthcare_claims_setup.sql</span>  <span class="ft-desc">← SQL script that originally created your Claims tables</span></div>
+<div><span class="ft-config">── 11. hr_analytics_setup.sql</span>       <span class="ft-desc">← SQL script that originally created your HR tables</span></div>
+<div><span class="ft-config">── 12. oracle_sales_setup.sql</span>        <span class="ft-desc">← SQL script that originally created your Oracle tables</span></div>
+</div>
+
+<div class="info-box info-blue" style="margin-top:18px;">
+  <strong>🔑 The golden rule:</strong> Every file that needs to talk to a database goes through <code>db_connector.py</code>.
+  Every file that needs credentials reads from <code>.env</code>. These two files are the foundations everything else builds on.
+</div>
+
+<h3 style="margin-top:24px;">How the files depend on each other (call graph)</h3>
+<div style="background:#fff;border:1px solid #dadce0;border-radius:12px;padding:24px;overflow-x:auto;">
+<svg viewBox="0 0 900 320" style="width:100%;min-width:600px;font-family:Segoe UI,sans-serif;">
+  <!-- Boxes -->
+  <!-- app.py -->
+  <rect x="10" y="130" width="120" height="50" rx="8" fill="#1a73e8"/>
+  <text x="70" y="150" text-anchor="middle" fill="white" font-size="12" font-weight="700">1. app.py</text>
+  <text x="70" y="168" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">Entry Point</text>
+
+  <!-- bi_dashboard -->
+  <rect x="200" y="50" width="150" height="50" rx="8" fill="#1a73e8"/>
+  <text x="275" y="70" text-anchor="middle" fill="white" font-size="11" font-weight="700">2. bi_dashboard.py</text>
+  <text x="275" y="86" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">Main AI Page</text>
+
+  <!-- connection manager -->
+  <rect x="200" y="215" width="150" height="50" rx="8" fill="#34a853"/>
+  <text x="275" y="235" text-anchor="middle" fill="white" font-size="11" font-weight="700">7.1 Connection</text>
+  <text x="275" y="251" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">Manager</text>
+
+  <!-- db_connector -->
+  <rect x="440" y="130" width="140" height="50" rx="8" fill="#f9ab00"/>
+  <text x="510" y="150" text-anchor="middle" fill="white" font-size="11" font-weight="700">3. db_connector.py</text>
+  <text x="510" y="166" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">Universal DB Engine</text>
+
+  <!-- db_registry -->
+  <rect x="660" y="50" width="130" height="50" rx="8" fill="#ea4335" opacity="0.85"/>
+  <text x="725" y="70" text-anchor="middle" fill="white" font-size="11" font-weight="700">4. db_registry.yaml</text>
+  <text x="725" y="86" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">Config</text>
+
+  <!-- .env -->
+  <rect x="660" y="130" width="130" height="50" rx="8" fill="#ea4335" opacity="0.85"/>
+  <text x="725" y="150" text-anchor="middle" fill="white" font-size="11" font-weight="700">5. .env</text>
+  <text x="725" y="166" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">Secrets</text>
+
+  <!-- schema_cache -->
+  <rect x="660" y="215" width="130" height="50" rx="8" fill="#7b1fa2" opacity="0.9"/>
+  <text x="725" y="235" text-anchor="middle" fill="white" font-size="11" font-weight="700">6. schema_cache.json</text>
+  <text x="725" y="251" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="10">Auto-generated cache</text>
+
+  <!-- Ollama/Claude/Gemini cloud -->
+  <rect x="200" y="280" width="150" height="30" rx="8" fill="#5f6368"/>
+  <text x="275" y="299" text-anchor="middle" fill="white" font-size="10">Ollama / Claude / Gemini</text>
+
+  <!-- Arrows: app → bi_dashboard -->
+  <line x1="130" y1="145" x2="195" y2="85" stroke="#1a73e8" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="148" y="105" fill="#1a73e8" font-size="9">navigates to</text>
+
+  <!-- app → connection manager -->
+  <line x1="130" y1="160" x2="195" y2="230" stroke="#34a853" stroke-width="2" marker-end="url(#arr2)"/>
+  <text x="130" y="215" fill="#34a853" font-size="9">navigates to</text>
+
+  <!-- bi_dashboard → db_connector -->
+  <line x1="350" y1="75" x2="435" y2="140" stroke="#f9ab00" stroke-width="2" marker-end="url(#arr3)"/>
+  <text x="370" y="110" fill="#b45309" font-size="9">uses</text>
+
+  <!-- connection manager → db_connector -->
+  <line x1="350" y1="235" x2="435" y2="175" stroke="#f9ab00" stroke-width="2" marker-end="url(#arr3)"/>
+  <text x="355" y="220" fill="#b45309" font-size="9">uses</text>
+
+  <!-- db_connector → db_registry -->
+  <line x1="580" y1="145" x2="655" y2="85" stroke="#ea4335" stroke-width="2" marker-end="url(#arr4)"/>
+  <text x="590" y="110" fill="#b31412" font-size="9">reads</text>
+
+  <!-- db_connector → schema_cache (write) -->
+  <line x1="580" y1="165" x2="655" y2="230" stroke="#7b1fa2" stroke-width="2" marker-end="url(#arr5)"/>
+  <text x="590" y="215" fill="#7b1fa2" font-size="9">writes</text>
+
+  <!-- bi_dashboard → schema_cache (read) -->
+  <line x1="275" y1="100" x2="660" y2="220" stroke="#7b1fa2" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arr5)"/>
+  <text x="430" y="155" fill="#7b1fa2" font-size="9">reads schema</text>
+
+  <!-- bi_dashboard → .env -->
+  <line x1="350" y1="60" x2="655" y2="145" stroke="#ea4335" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arr4)"/>
+  <text x="450" y="80" fill="#b31412" font-size="9">reads API keys</text>
+
+  <!-- bi_dashboard → cloud models -->
+  <line x1="275" y1="100" x2="275" y2="275" stroke="#5f6368" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arr6)"/>
+  <text x="280" y="200" fill="#5f6368" font-size="9">calls AI</text>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arr"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1a73e8"/></marker>
+    <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#34a853"/></marker>
+    <marker id="arr3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f9ab00"/></marker>
+    <marker id="arr4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ea4335"/></marker>
+    <marker id="arr5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#7b1fa2"/></marker>
+    <marker id="arr6" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5f6368"/></marker>
+  </defs>
+</svg>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="files">
+<h2>② Every File — What It Is and What It Does</h2>
+<p class="section-sub">Click any card to understand exactly what that file is responsible for.</p>
+
+<div class="file-grid">
+  <div class="file-card">
+    <div class="num">FILE 1</div>
+    <div class="fname">app.py</div>
+    <span class="chip chip-blue">Entry Point</span>
+    <h3>The Front Door</h3>
+    <p>The <strong>only</strong> file Streamlit executes directly. It sets the page title/icon, draws the sidebar branding and live database pills, then hands off to whichever page the user clicked. It knows about all other pages but does minimal work itself.</p>
+    <p><strong>Run it with:</strong> <code>streamlit run app.py --server.port 8502</code></p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 2</div>
+    <div class="fname">bi_dashboard.py</div>
+    <span class="chip chip-red">Core AI Logic</span>
+    <h3>The AI Brain</h3>
+    <p>The largest and most complex file. Contains the entire agent pipeline: vector memory search, query rewriting, AI routing supervisor, multi-model SQL generation with automatic fallback, federated query merging, result display, and thumbs-up feedback loop.</p>
+    <p><strong>Functions:</strong> <code>rewrite_query()</code> → <code>supervisor_routing()</code> → <code>agent_execution()</code></p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 3</div>
+    <div class="fname">db_connector.py</div>
+    <span class="chip chip-orange">Database Engine</span>
+    <h3>The Universal Connector</h3>
+    <p>Reads <code>db_registry.yaml</code> and builds SQLAlchemy connections to any database type. All database activity in the app goes through here — nobody opens their own connection directly. This is the "one source of truth" for all DB access.</p>
+    <p><strong>Key functions:</strong> <code>build_engine()</code>, <code>execute_query()</code>, <code>discover_schema()</code>, <code>test_connection()</code></p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 4</div>
+    <div class="fname">db_registry.yaml</div>
+    <span class="chip chip-orange">Configuration</span>
+    <h3>The Database Phonebook</h3>
+    <p>A plain-text config file (YAML format = indented key: value pairs). Lists every database: its type, hostname, username, which <code>.env</code> variable holds the password, and the domain label the AI uses for routing. <strong>Add new databases here.</strong> No Python needed.</p>
+    <p style="color:#b31412;">⚠️ Never put the actual password here — put the variable name (e.g. <code>AZURE_SQL_PASSWORD</code>) and store the value in <code>.env</code>.</p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 5</div>
+    <div class="fname">.env</div>
+    <span class="chip chip-red">Secrets</span>
+    <h3>Your Secrets File</h3>
+    <p>Stores passwords and API keys as <code>KEY=value</code> lines. <code>load_dotenv()</code> in Python loads it into memory. <code>os.getenv("KEY")</code> retrieves a value. This file <strong>must never be shared</strong> — it's the vault. If you ever use Git, add <code>.env</code> to your <code>.gitignore</code> file.</p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 6</div>
+    <div class="fname">schema_cache.json</div>
+    <span class="chip chip-purple">Auto-Generated</span>
+    <h3>The AI's Table Knowledge</h3>
+    <p>Created automatically when you click "Discover Schema" in Connection Manager. Stores every table name, column name, data type, primary key, and foreign key for every active database. The AI reads this to write accurate SQL. <strong>Re-run Discover Schema after any table changes.</strong></p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 7.1</div>
+    <div class="fname">pages/1_Connection_Manager.py</div>
+    <span class="chip chip-green">Settings UI</span>
+    <h3>Database Admin Panel</h3>
+    <p>The settings page. Lets you: test live connections, discover and browse schemas, add new databases via form, enable/disable connections. The <code>pages/</code> folder is a Streamlit convention — files here automatically become navigable pages.</p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 8</div>
+    <div class="fname">requirements.txt</div>
+    <span class="chip chip-grey">Dependencies</span>
+    <h3>Package List</h3>
+    <p>Lists all Python libraries the app needs. Run <code>pip install -r requirements.txt</code> once after a fresh install to get everything. Commented-out lines show optional packages for database types not yet activated.</p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILE 9</div>
+    <div class="fname">start_dashboard.bat</div>
+    <span class="chip chip-grey">Launcher</span>
+    <h3>Windows One-Click Start</h3>
+    <p>Double-click this to start everything: opens Streamlit in one window, waits 5 seconds, then starts ngrok tunnels so your dashboard is reachable from the internet via <code>https://sirish.ngrok.app</code>.</p>
+  </div>
+
+  <div class="file-card">
+    <div class="num">FILES 10–12</div>
+    <div class="fname">*.sql</div>
+    <span class="chip chip-grey">Setup Scripts</span>
+    <h3>Database Creation Scripts</h3>
+    <p>The SQL scripts that originally created your tables in each database: <code>healthcare_claims_setup.sql</code>, <code>hr_analytics_setup.sql</code>, <code>oracle_sales_setup.sql</code>. Not used by the running app — kept as reference for recreating your schema if needed.</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="queryflow">
+<h2>③ Complete Query Flow — Every Path With Examples</h2>
+<p class="section-sub">When you type a question, here are all the possible paths it can take — including every "what if it fails?" branch.</p>
+
+<!-- PATH A: HAPPY PATH -->
+<div class="flow-path">
+<h3>PATH A — Simple Question, Direct Hit (Most Common)</h3>
+<p style="font-size:0.85rem;margin-bottom:14px;">Example: <em>"What is the average salary by department?"</em> — asked for the first time with no chat history.</p>
+<div class="flow-steps">
+  <div class="fs">
+    <div class="num">1</div>
+    <div class="label">User types question</div>
+    <div class="sub">Enters text in the chat input at the bottom</div>
+    <div class="ex">"What is the average salary by department?"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">2</div>
+    <div class="label">rewrite_query()</div>
+    <div class="sub">No history → returns question unchanged</div>
+    <div class="ex">Returns as-is</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">3</div>
+    <div class="label">check_vector_memory()</div>
+    <div class="sub">Search SQL Server for similar past questions (≥65% match)</div>
+    <div class="ex">No match found → no hint provided</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">4</div>
+    <div class="label">supervisor_routing()</div>
+    <div class="sub">AI reads the question and picks a domain</div>
+    <div class="ex">Returns "HR"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">5</div>
+    <div class="label">agent_execution()</div>
+    <div class="sub">AI generates SQL using the schema. Runs it on the database.</div>
+    <div class="ex">SELECT department, AVG(salary)...</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">6</div>
+    <div class="label">Display Results</div>
+    <div class="sub">AI writes a 2-3 bullet summary. Table shown below it.</div>
+    <div class="ex">DataFrame + metrics shown</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">7</div>
+    <div class="label">👍 Feedback</div>
+    <div class="sub">If thumbs up → save_vector_memory() embeds question+SQL into SQL Server</div>
+    <div class="ex">Now stored for future use as a hint</div>
+  </div>
+</div>
+</div>
+
+<!-- PATH B: FOLLOW-UP (REWRITE) -->
+<div class="flow-path rewrite">
+<h3>PATH B — Follow-Up Question (Rewrite Triggered)</h3>
+<p style="font-size:0.85rem;margin-bottom:14px;">Example: Previous question was "average salary by department" — now user types <em>"what about just Sales?"</em></p>
+<div class="flow-steps">
+  <div class="fs">
+    <div class="num">1</div>
+    <div class="label">User types follow-up</div>
+    <div class="sub">Short, context-dependent question</div>
+    <div class="ex">"what about just Sales?"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">2</div>
+    <div class="label">rewrite_query()</div>
+    <div class="sub">Sees history, detects this is a follow-up. Rewrites it as a standalone question using context.</div>
+    <div class="ex">"What is the average salary for employees in the Sales department?"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">3</div>
+    <div class="label">UI shows interpretation</div>
+    <div class="sub">Caption appears: "Interpreted as: What is the average salary for employees in the Sales department?"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">4–7</div>
+    <div class="label">Continue as Path A</div>
+    <div class="sub">Now proceeds with the expanded, unambiguous question instead of the short follow-up</div>
+  </div>
+</div>
+<div class="deviation"><strong>⚠️ Why this matters:</strong> Without rewriting, the AI would receive "what about just Sales?" with no context and would have no idea what database, table, or metric to query. The rewriter prevents this failure mode.</div>
+</div>
+
+<!-- PATH C: MEMORY HIT -->
+<div class="flow-path memory">
+<h3>PATH C — Vector Memory Hit (Semantic Match Found)</h3>
+<p style="font-size:0.85rem;margin-bottom:14px;">Example: User previously asked "top 3 providers by billed amount" and gave it 👍. Now they ask <em>"who are the leading providers by total billing?"</em> — different words, same meaning.</p>
+<div class="flow-steps">
+  <div class="fs">
+    <div class="num">1</div>
+    <div class="label">User types question</div>
+    <div class="ex">"who are the leading providers by total billing?"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">2</div>
+    <div class="label">check_vector_memory()</div>
+    <div class="sub">Converts question to 768 numbers (embedding). Searches SQL Server for closest past question using cosine distance.</div>
+    <div class="ex">Finds 87% match: "top 3 providers by billed amount"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">3</div>
+    <div class="label">Memory hint injected</div>
+    <div class="sub">The matched past SQL is added to the AI's system prompt as a "CRITICAL OVERRIDE" hint</div>
+    <div class="ex">AI is told: "borrow this SQL heavily: SELECT TOP 3 ProviderName..."</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">4</div>
+    <div class="label">supervisor_routing()</div>
+    <div class="sub">Also receives memory hint to help with routing accuracy</div>
+    <div class="ex">Routes to CLAIMS</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">5</div>
+    <div class="label">agent_execution()</div>
+    <div class="sub">AI generates SQL closely following the hint. Far less likely to make mistakes.</div>
+    <div class="ex">SQL matches pattern of saved query</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">6</div>
+    <div class="label">UI shows "Memory Hit"</div>
+    <div class="sub">The confidence badge shows "Memory Hit" and the match % (e.g. "87.0% Match")</div>
+  </div>
+</div>
+<div class="deviation"><strong>💡 The learning loop:</strong> Every thumbs-up grows the memory bank. Over time, the app gets faster and more accurate because it stops re-inventing working SQL — it reuses patterns it knows work.</div>
+</div>
+
+<!-- PATH D: MODEL CASCADE -->
+<div class="flow-path cascade">
+<h3>PATH D — Model Cascade (First AI Fails, Auto-Escalation)</h3>
+<p style="font-size:0.85rem;margin-bottom:14px;">Example: You selected <em>gemma3:12b</em> (local) as primary, but the generated SQL has a syntax error on the first attempt.</p>
+<div class="flow-steps">
+  <div class="fs">
+    <div class="num">1</div>
+    <div class="label">agent_execution() tries primary model</div>
+    <div class="sub">Sends question + schema to gemma3:12b</div>
+    <div class="ex">Model returns SQL with a syntax error</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">2</div>
+    <div class="label">DB returns error</div>
+    <div class="sub">execute_query() reports failure. Status shows ⚠️.</div>
+    <div class="ex">Toast: "gemma3:12b Failed: Invalid column name"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">3</div>
+    <div class="label">Escalate to next model</div>
+    <div class="sub">Cascade list: [gemma3:12b, gemini-2.5-flash, claude-sonnet-4-6, ...]</div>
+    <div class="ex">Now tries gemini-2.5-flash</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">4</div>
+    <div class="label">gemini-2.5-flash succeeds</div>
+    <div class="sub">Returns valid SQL. DB query runs. Results returned.</div>
+    <div class="ex">Agent badge shows "gemini-2.5-flash"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">5</div>
+    <div class="label">UI shows "After 1 retry"</div>
+    <div class="sub">Confidence badge shows how many escalations happened</div>
+  </div>
+</div>
+<div class="deviation"><strong>⚠️ What if ALL models fail?</strong> After exhausting the entire cascade list (7 models), the app shows a red error: "Escalation failed. All models failed to generate a working query." This is very rare but can happen with very complex or ambiguous questions on niche schemas.</div>
+</div>
+
+<!-- PATH E: FEDERATED -->
+<div class="flow-path federated">
+<h3>PATH E — Federated Query (Two Databases, Joined in Python)</h3>
+<p style="font-size:0.85rem;margin-bottom:14px;">Example: <em>"Show me the names and total billed claims of employees in the Marketing department."</em> — requires HR (PostgreSQL) for names + Claims (SQL Server) for billed amounts.</p>
+<div class="flow-steps">
+  <div class="fs">
+    <div class="num">1</div>
+    <div class="label">supervisor_routing()</div>
+    <div class="sub">AI recognises the question needs data from two different databases</div>
+    <div class="ex">Returns "FEDERATED"</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">2</div>
+    <div class="label">agent_execution() — FEDERATED mode</div>
+    <div class="sub">AI is asked to generate TWO queries: one for PostgreSQL and one for SQL Server</div>
+    <div class="ex">postgres_query: SELECT emp_id, name... / sql_server_query: SELECT MemberID, SUM(BilledAmount)...</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">3</div>
+    <div class="label">Both DBs queried in parallel</div>
+    <div class="sub">get_db_data() called for HR and CLAIMS simultaneously</div>
+    <div class="ex">df_pg (employees) + df_ss (claims) returned</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">4</div>
+    <div class="label">Python merge (pd.merge)</div>
+    <div class="sub">emp_id (int) matched to MemberID (varchar) after type-casting both to strings</div>
+    <div class="ex">final_df = merge(df_pg, df_ss, left_on='emp_id', right_on='memberid')</div>
+  </div>
+  <div class="arr">›</div>
+  <div class="fs">
+    <div class="num">5</div>
+    <div class="label">Single merged result shown</div>
+    <div class="sub">User sees one table with columns from both databases. The SQL expander shows both queries.</div>
+  </div>
+</div>
+<div class="deviation"><strong>💡 Why not a SQL JOIN directly?</strong> SQL cannot natively join across two different database servers (PostgreSQL on one machine and SQL Server on another). So the app runs each query separately and does the join in Python's memory using pandas — this is called a "federated" approach.</div>
+</div>
+
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="vectors">
+<h2>④ Vector Memory — How It Really Works</h2>
+<p class="section-sub">This is one of the most powerful (and least obvious) features of your app. Here's a complete plain-English explanation.</p>
+
+<!-- WHAT IS AN EMBEDDING -->
+<h3>What is a "vector" / "embedding"?</h3>
+<p>When the app needs to "remember" a question, it doesn't store the words — it converts the question into a list of 768 numbers. This list is called a <strong>vector</strong> or <strong>embedding</strong>. Each number captures a tiny piece of the question's meaning.</p>
+
+<div class="vector-analogy">
+  <div class="analogy-box">
+    <h4>📍 The GPS analogy</h4>
+    <p>A GPS coordinate (latitude, longitude) is a pair of numbers that uniquely identifies a location on Earth. Two nearby places have similar coordinates. An embedding is the same idea — but for meaning. Two questions that mean the same thing will have similar coordinates in a 768-dimensional space, even if they use completely different words.</p>
+  </div>
+  <div class="analogy-box">
+    <h4>🎨 The color analogy</h4>
+    <p>The color "red" can be described as (255, 0, 0) in RGB — three numbers. "Dark red" is (139, 0, 0). They're different numbers but obviously similar. A question embedding works the same way — "top providers by billing" and "leading providers by total amount" will produce very similar 768-number vectors because they mean the same thing.</p>
+  </div>
+</div>
+
+<pre><span class="c"># This is what happens when you type "average salary by department":</span>
+vector = ollama.embeddings(model=<span class="s">"nomic-embed-text"</span>, prompt=<span class="s">"average salary by department"</span>)
+<span class="c"># vector["embedding"] is now a list of 768 floats, e.g.:</span>
+<span class="c"># [0.0234, -0.1823, 0.7741, 0.0012, -0.3401, 0.9012, ...]  ← 768 numbers total</span>
+<span class="c"># This list IS the "meaning" of your question, captured mathematically</span></pre>
+
+<h3 style="margin-top:20px;">How similarity is measured — Cosine Distance</h3>
+<p>To find questions in memory that are similar to a new one, the app computes the <strong>cosine distance</strong> between two vectors. A distance of 0 means identical meaning; distance of 1 means completely unrelated. The app converts distance to a percentage: <code>similarity = (1 - distance) × 100</code>.</p>
+
+<div style="background:#fff;border:1px solid #dadce0;border-radius:10px;padding:18px;margin:14px 0;">
+  <h4 style="margin-bottom:12px;font-size:0.9rem;">Example similarity scores against "average salary by department"</h4>
+  <div class="similarity-bar">
+    <div class="label"><span>"What is the mean salary grouped by department?"</span><span style="color:#137333;font-weight:700;">94%</span></div>
+    <div class="bar"><div class="fill fill-high" style="width:94%"></div></div>
+  </div>
+  <div class="similarity-bar">
+    <div class="label"><span>"Show me salaries for each team"</span><span style="color:#137333;font-weight:700;">81%</span></div>
+    <div class="bar"><div class="fill fill-high" style="width:81%"></div></div>
+  </div>
+  <div class="similarity-bar">
+    <div class="label"><span>"Who are the top 3 providers by billed amount?"</span><span style="color:#f9ab00;font-weight:700;">42%</span></div>
+    <div class="bar"><div class="fill fill-med" style="width:42%"></div></div>
+  </div>
+  <div class="similarity-bar">
+    <div class="label"><span>"What is the weather in New York?"</span><span style="color:#ea4335;font-weight:700;">8%</span></div>
+    <div class="bar"><div class="fill fill-low" style="width:8%"></div></div>
+  </div>
+  <p style="font-size:0.78rem;color:#5f6368;margin-top:10px;">The app triggers a memory hint at <strong>≥65%</strong>. It skips saving a duplicate at <strong>≥95%</strong>.</p>
+</div>
+
+<pre><span class="c"># SQL Server 2025 stores and searches vectors natively:</span>
+<span class="c"># The ai_query_cache table looks like this:</span>
+<span class="c">#   user_question      VARCHAR  — the original question text</span>
+<span class="c">#   sql_code           VARCHAR  — the SQL that worked</span>
+<span class="c">#   question_embedding VECTOR(768) — the 768 numbers representing the meaning</span>
+
+<span class="c"># Search: find the most similar past question</span>
+search_query = <span class="s">"""
+    SELECT TOP 1
+        user_question, sql_code,
+        VECTOR_DISTANCE('cosine', question_embedding, CAST(? AS VECTOR(768))) AS distance
+    FROM ai_query_cache
+    ORDER BY distance ASC;
+"""</span>
+<span class="c"># ORDER BY distance ASC = smallest distance first = most similar question first</span></pre>
+
+<!-- EVOLUTION FROM PGVECTOR TO SQL SERVER -->
+<h3 style="margin-top:28px;">📜 The Evolution: From pgvector → SQL Server 2025</h3>
+<p>You asked about this — yes, the vector memory system changed. Here's the full history:</p>
+
+<div class="evolution-steps">
+  <div class="evo-step">
+    <div class="era">Era 1 — Early Days</div>
+    <h4>No Memory</h4>
+    <p>Every question was treated as brand new. The AI had to figure out the SQL from scratch every time. Fast but couldn't learn from past successes.</p>
+  </div>
+  <div class="evo-arrow">→</div>
+  <div class="evo-step">
+    <div class="era">Era 2 — query_memory.json</div>
+    <h4>JSON File Memory</h4>
+    <p>Past queries saved to a JSON file. Simple text matching only — "average salary" would NOT match "mean pay". No semantic understanding. This is why all those entries had domain "UNKNOWN" — the domain tracking wasn't built yet.</p>
+  </div>
+  <div class="evo-arrow">→</div>
+  <div class="evo-step">
+    <div class="era">Era 3 — pgvector (PostgreSQL)</div>
+    <h4>pgvector Extension</h4>
+    <p>You installed the pgvector extension in PostgreSQL and manually created the table and index. Required: <code>CREATE EXTENSION vector;</code> and running setup SQL. Worked but needed a separate PostgreSQL step just for memory.</p>
+  </div>
+  <div class="evo-arrow">→</div>
+  <div class="evo-step current">
+    <div class="era">Era 4 — NOW ✅</div>
+    <h4>SQL Server 2025 Native Vectors</h4>
+    <p>SQL Server 2025 added <code>VECTOR(768)</code> as a native column type and <code>VECTOR_DISTANCE()</code> as a built-in function. No extension to install. Your existing <code>HealthcareClaims</code> database now holds the AI memory in the <code>ai_query_cache</code> table.</p>
+  </div>
+</div>
+
+<div class="info-box info-green" style="margin-top:16px;">
+  <strong>✅ What this means for you:</strong> You no longer need to maintain a separate PostgreSQL setup just for vector memory. SQL Server 2025 handles it natively. The <code>ai_query_cache</code> table in your <code>HealthcareClaims</code> database IS your memory bank.
+</div>
+
+<div class="info-box info-orange" style="margin-top:8px;">
+  <strong>📋 The table you created manually in SQL Server:</strong>
+  <pre style="margin-top:8px;font-size:0.78rem;background:#fff7e6;color:#78350f;border-radius:6px;padding:12px;">CREATE TABLE ai_query_cache (
+    id                 INT IDENTITY PRIMARY KEY,
+    user_question      NVARCHAR(MAX),
+    sql_code           NVARCHAR(MAX),
+    question_embedding VECTOR(768),   -- requires SQL Server 2025
+    created_at         DATETIME DEFAULT GETDATE()
+);</pre>
+</div>
+
+<h3 style="margin-top:20px;">The full memory lifecycle</h3>
+<table>
+  <thead><tr><th>Step</th><th>Function</th><th>What happens</th><th>Threshold</th></tr></thead>
+  <tbody>
+    <tr><td>Save</td><td><code>save_vector_memory()</code></td><td>Converts question → 768 numbers via nomic-embed-text (Ollama on your GPU). Stores in SQL Server. Only triggers on 👍 feedback.</td><td>Only if &lt;95% match already exists (deduplication)</td></tr>
+    <tr><td>Search</td><td><code>check_vector_memory()</code></td><td>Converts new question → 768 numbers. Runs VECTOR_DISTANCE query in SQL Server. Returns closest match.</td><td>Returns a hint only if similarity ≥ 65%</td></tr>
+    <tr><td>Use hint</td><td><code>supervisor_routing()</code></td><td>Injects memory hint into routing prompt to improve domain detection</td><td>Any match found</td></tr>
+    <tr><td>Use hint</td><td><code>agent_execution()</code></td><td>Injects past SQL as "CRITICAL OVERRIDE" into the SQL generation prompt</td><td>≥65% match only</td></tr>
+  </tbody>
+</table>
+
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="models">
+<h2>⑤ AI Models — What Each One Is Good For</h2>
+<p class="section-sub">Your app uses a "cascade" — if the first model fails, it automatically tries the next one in the list.</p>
+
+<table>
+  <thead><tr><th>Model</th><th>Provider</th><th>Tier</th><th>Cost</th><th>Runs On</th><th>Best For</th></tr></thead>
+  <tbody>
+    <tr><td><code>claude-opus-4-6</code></td><td>Anthropic</td><td><span class="chip chip-orange">Elite</span></td><td>💰💰💰</td><td>Cloud API</td><td>Complex, ambiguous, multi-step questions</td></tr>
+    <tr><td><code>claude-sonnet-4-6</code></td><td>Anthropic</td><td><span class="chip chip-orange">Elite</span></td><td>💰💰</td><td>Cloud API</td><td>Best balance of quality + speed + cost</td></tr>
+    <tr><td><code>gemini-2.5-flash</code></td><td>Google</td><td><span class="chip chip-blue">Fast</span></td><td>💰</td><td>Cloud API</td><td>Fallback workhorse, high volume, fast</td></tr>
+    <tr><td><code>claude-haiku-4-5</code></td><td>Anthropic</td><td><span class="chip chip-blue">Fast</span></td><td>💰</td><td>Cloud API</td><td>Routing decisions, query rewrites</td></tr>
+    <tr><td><code>gemma3:12b</code></td><td>Google/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Offline use, general reasoning</td></tr>
+    <tr><td><code>qwen2.5-coder:7b</code></td><td>Alibaba/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Code/SQL generation (trained on code)</td></tr>
+    <tr><td><code>deepseek-r1:8b</code></td><td>DeepSeek/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Reasoning chains, step-by-step problems</td></tr>
+  </tbody>
+</table>
+
+<div class="info-box info-blue" style="margin-top:16px;">
+  <strong>📌 Cascade order in agent_execution():</strong><br>
+  [your selected model] → gemini-2.5-flash → gemini-3.1-flash-lite-preview → claude-sonnet-4-6 → qwen2.5-coder:7b → deepseek-r1:8b → gemma3:12b<br>
+  <span style="font-size:0.82rem;opacity:0.8;">Duplicates are removed automatically, so if you select claude-sonnet-4-6 it won't appear twice.</span>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="features">
+<h2>⑥ New Features Added</h2>
+<p class="section-sub">Six improvements implemented in the second session — all with educational notes.</p>
+
+<h3>① Row Limit Guardrail — <code>db_connector.py</code></h3>
+<p>Every query now gets a hard cap of <strong>500 rows</strong> automatically injected before it reaches the database, unless the query already has a <code>TOP</code> or <code>LIMIT</code> clause. This prevents a runaway <code>SELECT * FROM Claims</code> from returning 500,000 rows and crashing the browser.</p>
+<table style="margin:10px 0">
+  <thead><tr><th>Database</th><th>How the limit is injected</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>SQL Server / Azure SQL</td><td>Adds <code>TOP N</code> after the first <code>SELECT</code></td><td><code>SELECT TOP 500 * FROM Claims</code></td></tr>
+    <tr><td>PostgreSQL / MySQL / SQLite</td><td>Appends <code>LIMIT N</code> at the end</td><td><code>SELECT * FROM hr_employees LIMIT 500</code></td></tr>
+    <tr><td>Oracle</td><td>Wraps in subquery with <code>ROWNUM &lt;= N</code></td><td><code>SELECT * FROM (...) WHERE ROWNUM &lt;= 500</code></td></tr>
+  </tbody>
+</table>
+<p>The function returns a <code>was_limited</code> flag. When <code>True</code>, the UI shows a yellow warning: "Results capped at 500 rows — add a WHERE clause to narrow down." The limit can be changed by editing the <code>MAX_ROWS = 500</code> constant in <code>bi_dashboard.py</code>. Scheduled reports use a higher cap of 5,000 rows since they're meant for full exports.</p>
+
+<h3>② FEDERATED Domain Routing is now Dynamic — <code>bi_dashboard.py</code></h3>
+<p>Previously the federated query logic was hardcoded to only work with <code>HR</code> + <code>CLAIMS</code>. Now it reads from a <code>FEDERATED_JOIN_CONFIGS</code> dictionary. Adding a new database pair is just adding one entry to that dict — no other code changes needed.</p>
+<p>The AI is now given query keys named after the actual domain (<code>HR_query</code>, <code>CLAIMS_query</code>) instead of the vague <code>postgres_query</code>/<code>sql_server_query</code>. This means the AI knows exactly which database each query goes to.</p>
+
+<h3>③ Azure SQL FEDERATED Support — <code>bi_dashboard.py</code></h3>
+<p>Added <code>frozenset(["HR", "AZURE_CLAIMS"])</code> to <code>FEDERATED_JOIN_CONFIGS</code>. Now you can ask questions like <em>"Show HR employees with their Azure Claims history"</em> and the federated engine will query PostgreSQL (HR) + Azure SQL (Claims) and merge them in Python — exactly the same way HR + local Claims works.</p>
+
+<h3>④ Row Count Warning — <code>bi_dashboard.py</code></h3>
+<p>When results were automatically capped by the row limit, a yellow <code>st.warning()</code> box appears above the download button: <em>"⚠️ Results capped at 500 rows. Add a WHERE clause to narrow down."</em> This uses the <code>was_limited</code> flag returned by <code>db_connector.execute_query()</code>. The flag is also stored in the message metadata so the warning still shows when scrolling back through chat history.</p>
+
+<h3>⑤ Download as Excel — <code>bi_dashboard.py</code></h3>
+<p>Every query result now has a <strong>📥 Download as Excel</strong> button. Clicking it converts the DataFrame to an Excel file in memory (using <code>BytesIO</code> — no temp file written to disk) and serves it as a file download. The filename includes the timestamp so multiple downloads don't overwrite each other. Requires the <code>openpyxl</code> package (added to <code>requirements.txt</code>).</p>
+
+<h3>⑥ Scheduled Reports — <code>pages/2_Scheduled_Reports.py</code></h3>
+<p>A brand new third page in the Settings section. Lets you:</p>
+<ul style="margin:8px 0 8px 20px;font-size:0.88rem;color:#3c4043;">
+  <li>Save any SQL query as a named report with a description, database domain, and <strong>run frequency</strong></li>
+  <li>Run any report on demand with a <strong>▶️ Run Now</strong> button</li>
+  <li>Download the result as Excel directly from the page</li>
+  <li>Run all saved reports at once with <strong>▶️ Run All Reports</strong></li>
+  <li>Generate a <code>run_all_reports.bat</code> + <code>run_all_reports.py</code> for Windows Task Scheduler</li>
+</ul>
+
+<h4 style="margin-top:14px;font-size:0.9rem;">Form fix: st.form() for atomic widget submission</h4>
+<p>The Add New Report form is wrapped in <code>st.form()</code> instead of using plain buttons. This ensures all form inputs (name, description, domain, SQL, frequency, max_rows) are captured together in one atomic submission. Without this, Streamlit's button rerun could lose widget values from conditional form blocks. The fix uses <code>st.form_submit_button()</code> instead of <code>st.button()</code> — this guarantees the form values persist.</p>
+
+<h4 style="margin-top:14px;font-size:0.9rem;">Run Frequency field for scheduling</h4>
+<p>Each report now stores a <strong>Run Frequency</strong> choice: "On Demand", "Daily", "Weekly (Mon)", or "Monthly (1st)". This is saved with the report in <code>saved_reports.json</code> and later used when generating the Windows Task Scheduler batch file. When you click <strong>⚙️ Generate Batch File</strong>, the Task Scheduler section automatically reads all frequencies from your saved reports and summarizes them (e.g., "Daily, Weekly (Mon)") — you don't need to pick one globally anymore.</p>
+
+<p><strong>Reports are stored in</strong> <code>saved_reports.json</code>. <strong>Output Excel files go to</strong> <code>reports_output/</code>. <strong>The Task Scheduler setup</strong> walks you through adding the batch file to Windows — no extra tools needed.</p>
+
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="improvements">
+<h2>⑦ All Changes Made</h2>
+<p class="section-sub">Everything that was fixed, cleaned up, or documented.</p>
+
+<table>
+  <thead><tr><th>Type</th><th>What changed</th><th>Why it matters</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="chip chip-red">BUG FIX</span></td>
+      <td>Hardcoded absolute path <code>c:\Users\siris\...</code> in <code>bi_dashboard.py</code></td>
+      <td>Would break if folder was renamed or moved. Now uses <code>load_dotenv()</code> which finds <code>.env</code> automatically.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-red">BUG FIX</span></td>
+      <td>Active Databases info box was hardcoded to 4 specific databases</td>
+      <td>Now reads from <code>db_registry.yaml</code> dynamically. Your 5th+ database will appear automatically.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-red">BUG FIX</span></td>
+      <td>Duplicate <code>st.set_page_config</code> in Connection Manager</td>
+      <td>Streamlit only allows this call once. Removed from sub-page — it only lives in <code>app.py</code> now.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-red">BUG FIX</span></td>
+      <td><code>import pandas as pd</code> was inside a loop in Connection Manager</td>
+      <td>Imports must be at the top of the file. Now correctly placed.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-green">DELETED</span></td>
+      <td><code>multi_db_bi_engine.py</code> — original prototype</td>
+      <td>Not imported anywhere. Was the first version before the registry/UI was built.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-green">DELETED</span></td>
+      <td><code>query_memory.json</code> — old JSON memory</td>
+      <td>Replaced by SQL Server 2025 vector memory. All entries had domain "UNKNOWN" (pre-routing era).</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-green">DELETED</span></td>
+      <td><code>test_connection.py</code>, <code>query_employee.py</code></td>
+      <td>Early one-off test scripts. Functionality now covered by Connection Manager UI.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-green">DELETED</span></td>
+      <td><code>system_health_check.py</code></td>
+      <td>Had a hardcoded password in plain text — security risk. Not used by the app.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-green">DELETED</span></td>
+      <td><code>sirish.txt</code>, <code>oauth.yml</code></td>
+      <td>Empty/abandoned fragments with no function.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-blue">ADDED</span></td>
+      <td>Azure SQL connection (<code>azure_sql</code> in registry)</td>
+      <td>Connected to <code>sirish-azure-sql-server.database.windows.net</code> with domain <code>AZURE_CLAIMS</code>. Verified connected at 1.65s latency.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-blue">ADDED</span></td>
+      <td>Educational comments in all active files</td>
+      <td>Every file now has a header explaining its role and key functions have docstrings for learning.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-red">BUG FIX</span></td>
+      <td>Scheduled Reports save button showing "required fields" error even when form was filled</td>
+      <td>Form wrapped in <code>st.form()</code> instead of plain <code>st.button()</code>. This ensures all widget values (name, SQL, domain) are captured atomically before any Streamlit rerun, preventing state loss on conditionally-shown forms.</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-orange">FEATURE</span></td>
+      <td>Run Frequency field in Scheduled Reports</td>
+      <td>Each report now has a frequency choice: "On Demand", "Daily", "Weekly (Mon)", or "Monthly (1st)". Saved with the report and auto-summarized when generating the Windows Task Scheduler batch file.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 style="margin-top:28px;">What your clean project folder looks like now</h3>
+<div class="file-tree">
+<div>sirish_ai/</div>
+<div>&nbsp;&nbsp;├── <span class="ft-file">app.py</span>                          <span class="ft-desc">START HERE</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-file">bi_dashboard.py</span>                 <span class="ft-desc">AI chat page</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-file">db_connector.py</span>                 <span class="ft-desc">Universal DB engine</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">db_registry.yaml</span>                <span class="ft-desc">Database config (4 active, 7 placeholders)</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">.env</span>                            <span class="ft-desc">Secrets — never share</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-auto">schema_cache.json</span>               <span class="ft-desc">Auto-generated schema knowledge</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">requirements.txt</span>                <span class="ft-desc">pip install -r requirements.txt</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">start_dashboard.bat</span>             <span class="ft-desc">Windows launcher (Streamlit + ngrok)</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">healthcare_claims_setup.sql</span>     <span class="ft-desc">Reference: Claims table creation script</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">hr_analytics_setup.sql</span>          <span class="ft-desc">Reference: HR table creation script</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">oracle_sales_setup.sql</span>          <span class="ft-desc">Reference: Oracle table creation script</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-file">PROJECT_GUIDE.html</span>              <span class="ft-desc">← This file</span></div>
+<div>&nbsp;&nbsp;└── <span class="ft-entry">pages/</span></div>
+<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="ft-file">1_Connection_Manager.py</span>     <span class="ft-desc">DB settings page</span></div>
+<div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="ft-file">2_Scheduled_Reports.py</span>      <span class="ft-desc">NEW — save & schedule SQL reports, export to Excel</span></div>
+<div>&nbsp;&nbsp;├── <span class="ft-config">saved_reports.json</span>              <span class="ft-desc">Auto-created when you save your first report</span></div>
+<div>&nbsp;&nbsp;└── <span class="ft-auto">reports_output/</span>                 <span class="ft-desc">Auto-created folder — Excel files saved here on report run</span></div>
+</div>
+
+<div class="info-box info-green" style="margin-top:18px;">
+  <strong>13 files total.</strong> Every single one has a clear purpose. None are dead weight. That's a clean, professional project structure.
+</div>
+
+</section>
+
+</main>
+<footer>Multi-Agent BI Engine · Built by Sirish Bhatta · Project Guide generated April 2026</footer>
+</body>
+</html>

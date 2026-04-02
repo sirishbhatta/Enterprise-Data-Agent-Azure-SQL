@@ -1,0 +1,35 @@
+# ============================================================
+# Multi-Database BI Engine — Requirements
+# ============================================================
+
+# ── Core UI & Orchestration ──────────────────────────────────
+streamlit                  # Dashboard interface
+python-dotenv              # .env file loading
+
+# ── Universal DB Adapter ────────────────────────────────────
+sqlalchemy                 # Core ORM / engine factory (used by db_connector.py)
+PyYAML                     # db_registry.yaml parsing
+
+# ── Database Drivers (Active) ───────────────────────────────
+psycopg2-binary            # PostgreSQL
+pyodbc                     # SQL Server via Windows ODBC
+
+# ── Database Drivers (Install when activating placeholders) ─
+# pymysql                  # MySQL
+# snowflake-sqlalchemy     # Snowflake
+# sqlalchemy-bigquery      # Google BigQuery
+oracledb                   # Oracle 21c XE — thin mode, NO Instant Client needed (SQLAlchemy dialect built-in)
+# duckdb-engine            # DuckDB
+# databricks-sql-connector # Databricks
+# sqlalchemy-redshift      # Amazon Redshift
+# redshift_connector       # Amazon Redshift (connector)
+
+# ── AI / LLM Clients ────────────────────────────────────────
+anthropic                  # Claude (Opus, Sonnet, Haiku)
+google-genai               # Gemini (2.5 Flash, etc.)
+ollama                     # Local models (Gemma, Qwen, DeepSeek, etc.)
+
+# ── Data & Formatting ───────────────────────────────────────
+pandas                     # DataFrame operations
+sqlparse                   # SQL pretty-printing in UI
+openpyxl                   # Excel export — required by Download as Excel and Scheduled Reports
