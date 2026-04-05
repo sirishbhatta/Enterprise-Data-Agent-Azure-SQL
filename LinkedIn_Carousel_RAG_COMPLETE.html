@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3rd Post: RAG Agent Architecture - Complete</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0F1419 0%, #1a3a4a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .carousel-container {
+            width: 100%;
+            max-width: 100%;
+            height: 100vh;
+            max-height: 100vh;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+            animation: slideIn 0.5s ease-in-out;
+            flex-direction: column;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* TITLE SLIDES */
+        .slide.title-slide {
+            background: linear-gradient(135deg, #0F1419 0%, #1a3a4a 100%);
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        .slide.title-slide::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 12px;
+            height: 100%;
+            background: #00A896;
+        }
+
+        .slide.title-slide .slide-number {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #00A896;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .slide.title-slide h1 {
+            color: #FFFFFF;
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .slide.title-slide p {
+            color: #F5F5F5;
+            font-size: 24px;
+            font-weight: 300;
+            line-height: 1.4;
+        }
+
+        /* CONTENT SLIDES */
+        .slide.content-slide {
+            background: #FFFFFF;
+        }
+
+        .slide.content-slide::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 12px;
+            height: 100%;
+            background: #00A896;
+        }
+
+        .slide-header {
+            background: #0F1419;
+            color: #FFFFFF;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #00A896;
+            flex-shrink: 0;
+        }
+
+        .slide-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .slide-header .slide-number {
+            color: #00A896;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .slide-content {
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            font-size: 14px;
+        }
+
+        /* SYSTEM OVERVIEW - SPECIAL */
+        .overview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .overview-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .overview-box {
+            background: #F5F5F5;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #00A896;
+        }
+
+        .overview-title {
+            font-weight: 700;
+            font-size: 12px;
+            color: #0F1419;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .overview-item {
+            font-size: 11px;
+            color: #2C3E50;
+            line-height: 1.5;
+            margin-bottom: 4px;
+        }
+
+        .overview-item strong {
+            color: #00A896;
+            font-weight: 700;
+        }
+
+        .gpu-box {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #FFFFFF;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #00A896;
+        }
+
+        .gpu-box .overview-title {
+            color: #00A896;
+        }
+
+        .gpu-box .overview-item {
+            color: #E8E8E8;
+        }
+
+        .gpu-box .overview-item strong {
+            color: #00FF88;
+        }
+
+        /* BLUEPRINT FLOW */
+        .blueprint-flow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+
+        .flow-box {
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 120px;
+            white-space: nowrap;
+        }
+
+        .flow-box.teal {
+            background: #00A896;
+            color: #FFFFFF;
+        }
+
+        .flow-box.gold {
+            background: #F9AB00;
+            color: #0F1419;
+        }
+
+        .flow-box.charcoal {
+            background: #2C3E50;
+            color: #FFFFFF;
+        }
+
+        .flow-arrow {
+            color: #0F1419;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .blueprint-desc {
+            background: #F5F5F5;
+            padding: 15px;
+            border-radius: 6px;
+            color: #2C3E50;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 15px;
+        }
+
+        .blueprint-desc ol {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+
+        .blueprint-desc li {
+            margin-bottom: 4px;
+        }
+
+        /* PATH STEPS */
+        .path-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .step {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px;
+            background: #F5F5F5;
+            border-radius: 6px;
+        }
+
+        .step-num {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #00A896;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-label {
+            font-weight: 700;
+            font-size: 12px;
+            color: #0F1419;
+            margin-bottom: 3px;
+        }
+
+        .step-desc {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+
+        .step-example {
+            font-size: 11px;
+            color: #00A896;
+            font-family: monospace;
+            font-style: italic;
+        }
+
+        /* SIMILARITY BARS */
+        .similarity-item {
+            margin-bottom: 12px;
+        }
+
+        .similarity-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #0F1419;
+        }
+
+        .similarity-bar {
+            height: 12px;
+            background: #E8E8E8;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .similarity-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.3s;
+        }
+
+        .similarity-fill.high {
+            background: #137333;
+            width: 94%;
+        }
+
+        .similarity-fill.med {
+            background: #F9AB00;
+            width: 81%;
+        }
+
+        .similarity-fill.low {
+            background: #F9AB00;
+            width: 42%;
+        }
+
+        .similarity-fill.verylow {
+            background: #EA4335;
+            width: 8%;
+        }
+
+        /* EVOLUTION */
+        .evolution-timeline {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .evo-item {
+            background: #F5F5F5;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #00A896;
+        }
+
+        .evo-week {
+            font-weight: 700;
+            font-size: 11px;
+            color: #00A896;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .evo-title {
+            font-weight: 700;
+            font-size: 12px;
+            color: #0F1419;
+            margin-bottom: 4px;
+        }
+
+        .evo-desc {
+            font-size: 10px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        /* GRID LAYOUTS */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .card {
+            background: #F5F5F5;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #00A896;
+        }
+
+        .card h3 {
+            font-size: 12px;
+            font-weight: 700;
+            color: #0F1419;
+            margin-bottom: 6px;
+        }
+
+        .card p {
+            font-size: 11px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        /* CONTROLS - BOTTOM */
+        .controls-wrapper {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 20, 25, 0.95);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            z-index: 1000;
+            border-top: 1px solid #00A896;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #00A896;
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #008878;
+        }
+
+        button:disabled {
+            background: #CCCCCC;
+            cursor: not-allowed;
+        }
+
+        .slide-counter {
+            color: #00A896;
+            font-weight: bold;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .dots {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .dot.active {
+            background: #00A896;
+        }
+
+        /* MOBILE OPTIMIZATION */
+        @media (max-width: 768px) {
+            .slide.title-slide h1 {
+                font-size: 36px;
+            }
+
+            .slide.title-slide p {
+                font-size: 18px;
+            }
+
+            .slide-header h2 {
+                font-size: 22px;
+            }
+
+            .overview-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .blueprint-flow {
+                font-size: 10px;
+            }
+
+            .flow-box {
+                padding: 10px 12px;
+                font-size: 10px;
+                min-width: 100px;
+            }
+
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .grid-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .evolution-timeline {
+                grid-template-columns: 1fr;
+            }
+
+            .controls-wrapper {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="carousel-container">
+    <!-- SLIDE 1: Title -->
+    <div class="slide title-slide active">
+        <div class="slide-number">1/9</div>
+        <h1>3rd Post: RAG Agent Architecture</h1>
+        <p>How my AI system learned to remember, route, and scale in just 4 weeks.</p>
+    </div>
+
+    <!-- SLIDE 2: System Overview -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>System Overview: What's Running Where</h2>
+            <div class="slide-number">2/9</div>
+        </div>
+        <div class="slide-content">
+            <div class="overview-grid">
+                <!-- LEFT: Active Infrastructure -->
+                <div class="overview-section">
+                    <div class="overview-box">
+                        <div class="overview-title">🗄️ Active Databases (4)</div>
+                        <div class="overview-item"><strong>HR Analytics</strong> — PostgreSQL (LOCAL)</div>
+                        <div class="overview-item"><strong>Healthcare Claims</strong> — SQL Server (LOCAL)</div>
+                        <div class="overview-item"><strong>Oracle Sales</strong> — Oracle (LOCAL)</div>
+                        <div class="overview-item"><strong>Azure Claims</strong> — SQL Server (CLOUD)</div>
+                    </div>
+
+                    <div class="overview-box">
+                        <div class="overview-title">🧠 Active LLM Providers (3)</div>
+                        <div class="overview-item"><strong>Claude Series</strong> — Opus, Sonnet, Haiku (Cloud | Tiered Cost)</div>
+                        <div class="overview-item"><strong>Gemini Flash</strong> — Google (Cloud | Low Cost)</div>
+                        <div class="overview-item"><strong>Ollama Local</strong> — Gemma3, Qwen, DeepSeek (Free | GPU)</div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Local Hardware + GPU -->
+                <div class="overview-section">
+                    <div class="gpu-box">
+                        <div class="overview-title">💻 Running Locally: Windows 11 PC</div>
+                        <div class="overview-item">🖥️ <strong>Streamlit App</strong> — HTTP://localhost:8502</div>
+                        <div class="overview-item">⚙️ <strong>Ollama Server</strong> — Port 11434 (running 24/7)</div>
+                        <div class="overview-item">🔌 <strong>Nvidia RTX 3060</strong> — 12GB VRAM</div>
+                        <div class="overview-item">📦 <strong>Models Installed:</strong></div>
+                        <div style="margin-left: 16px; font-size: 10px;">
+                            • nomic-embed-text (768 embeddings)<br>
+                            • gemma3:12b | qwen2.5-coder | deepseek-r1
+                        </div>
+                    </div>
+
+                    <div class="gpu-box">
+                        <div class="overview-title">⚡ GPU Usage: When It Activates</div>
+                        <div class="overview-item">✅ <strong>Vector Embeddings:</strong> Every question → 768 numbers (5-10ms on GPU)</div>
+                        <div class="overview-item">✅ <strong>Local Model Inference:</strong> Qwen/DeepSeek/Gemma queries (1-3s per query)</div>
+                        <div class="overview-item">✅ <strong>Scheduled Reports:</strong> Batch runs use GPU for embeddings</div>
+                        <div class="overview-item">❌ <strong>Cloud Model Calls:</strong> API inference (Claude/Gemini) — no GPU needed</div>
+                    </div>
+
+                    <div class="overview-box" style="border-left-color: #F9AB00;">
+                        <div class="overview-title" style="color: #B45309;">📅 Scheduling Capability</div>
+                        <div class="overview-item">🪟 <strong>Windows Task Scheduler</strong> integration</div>
+                        <div class="overview-item">⏱️ <strong>Frequencies:</strong> Daily | Weekly | Monthly | On-Demand</div>
+                        <div class="overview-item">📊 Auto-generated <code>.bat</code> files for automation</div>
+                        <div class="overview-item">💾 Reports export to Excel in <code>/reports_output</code></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: Evolution - Context -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>Evolution: In My App Over a Month</h2>
+            <div class="slide-number">3/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #666; font-size: 12px; margin-bottom: 12px;">From no memory to vector-powered learning:</p>
+
+            <div class="evolution-timeline">
+                <div class="evo-item">
+                    <div class="evo-week">Week 1</div>
+                    <div class="evo-title">No Memory</div>
+                    <div class="evo-desc">Every question regenerated from scratch. No learning.</div>
+                </div>
+
+                <div class="evo-item">
+                    <div class="evo-week">Week 2</div>
+                    <div class="evo-title">JSON Attempt</div>
+                    <div class="evo-desc">Text matching only. "Salary" ≠ "pay". Failed.</div>
+                </div>
+
+                <div class="evo-item">
+                    <div class="evo-week">Week 3</div>
+                    <div class="evo-title">pgvector</div>
+                    <div class="evo-desc">PostgreSQL extension. Worked but complex setup.</div>
+                </div>
+
+                <div class="evo-item" style="border-left-color: #00A896; background: #F0FDF4;">
+                    <div class="evo-week" style="color: #137333;">Week 4 ✅</div>
+                    <div class="evo-title">SQL Server 2025 Vectors</div>
+                    <div class="evo-desc">Native VECTOR(768) type. No extension. Clean. Fast.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: Blueprint -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>The Blueprint: 4-Step Flow</h2>
+            <div class="slide-number">4/9</div>
+        </div>
+        <div class="slide-content">
+            <div class="blueprint-flow">
+                <div class="flow-box teal">User Question</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box gold">Vector Memory</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box charcoal">Supervisor AI</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box teal">Results</div>
+            </div>
+            <div class="blueprint-desc">
+                <strong>What happens:</strong>
+                <ol>
+                    <li>Question → 768 numbers (embedding)</li>
+                    <li>Search past successes (similarity ≥65%)</li>
+                    <li>Route to correct database</li>
+                    <li>Execute with memory hints</li>
+                    <li>Return results + summary</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: PATH A Detailed -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>PATH A: The Happy Path (7 Steps)</h2>
+            <div class="slide-number">5/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #666; font-size: 11px; margin-bottom: 10px;"><em>Example: "What is average salary by department?" (first time)</em></p>
+            <div class="path-steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-content">
+                        <div class="step-label">User types question</div>
+                        <div class="step-example">"What is average salary by department?"</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-content">
+                        <div class="step-label">Rewrite (check history)</div>
+                        <div class="step-desc">No history → returns unchanged</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-content">
+                        <div class="step-label">Vector Memory Search</div>
+                        <div class="step-desc">Search SQL Server for similar questions (≥65%)</div>
+                        <div class="step-example">No match → no hint</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div class="step-content">
+                        <div class="step-label">Supervisor Routing</div>
+                        <div class="step-example">Returns: "HR"</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">5</div>
+                    <div class="step-content">
+                        <div class="step-label">SQL Generation</div>
+                        <div class="step-example">SELECT dept, AVG(salary)...</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">6</div>
+                    <div class="step-content">
+                        <div class="step-label">Display Results</div>
+                        <div class="step-desc">Table + AI summary</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">7</div>
+                    <div class="step-content">
+                        <div class="step-label">👍 Feedback saves</div>
+                        <div class="step-desc">Stored in vector memory for future hints</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Memory + Cosine Distance -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>How Memory Works: Cosine Distance</h2>
+            <div class="slide-number">6/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #666; font-size: 11px; margin-bottom: 12px;">Converts questions to 768 numbers, measures similarity (0=identical, 1=unrelated)</p>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"Mean salary grouped by department?"</span>
+                    <span style="color: #137333; font-weight: 700;">94%</span>
+                </div>
+                <div class="similarity-bar"><div class="similarity-fill high"></div></div>
+            </div>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"Show me salaries for each team"</span>
+                    <span style="color: #137333; font-weight: 700;">81%</span>
+                </div>
+                <div class="similarity-bar"><div class="similarity-fill med"></div></div>
+            </div>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"Top 3 providers by billed amount?"</span>
+                    <span style="color: #F9AB00; font-weight: 700;">42%</span>
+                </div>
+                <div class="similarity-bar"><div class="similarity-fill low"></div></div>
+            </div>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"What is the weather?"</span>
+                    <span style="color: #EA4335; font-weight: 700;">8%</span>
+                </div>
+                <div class="similarity-bar"><div class="similarity-fill verylow"></div></div>
+            </div>
+
+            <div style="background: #FFF8E1; border-left: 4px solid #F9AB00; padding: 10px; border-radius: 6px; margin-top: 12px; font-size: 11px; color: #B45309;">
+                ≥65% = memory hint | ≥95% = skip duplicate
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: PATH B + C + D Combined -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>Path Improvements: B, C, D</h2>
+            <div class="slide-number">7/9</div>
+        </div>
+        <div class="slide-content">
+            <div class="grid-3">
+                <div class="card">
+                    <h3>B: Follow-Up Rewrite</h3>
+                    <p><strong>Problem:</strong> "What about just Sales?" (out of context)</p>
+                    <p><strong>Fix:</strong> AI expands using history → "What is average salary for Sales?"</p>
+                </div>
+
+                <div class="card">
+                    <h3>C: Memory Hit</h3>
+                    <p><strong>Problem:</strong> Asked "top providers" before. Now asking "leading providers?"</p>
+                    <p><strong>Fix:</strong> 87% match found. Past SQL injected. Badge: "Memory Hit 87%"</p>
+                </div>
+
+                <div class="card">
+                    <h3>D: Model Cascade</h3>
+                    <p><strong>Problem:</strong> Local AI fails (syntax error)</p>
+                    <p><strong>Fix:</strong> Auto-escalate to Gemini → succeeds. Badge: "After 1 retry"</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 8: PATH E + Models Combined -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>Specialized Paths: Federated + Cascade</h2>
+            <div class="slide-number">8/9</div>
+        </div>
+        <div class="slide-content">
+            <div class="grid-2">
+                <div class="card">
+                    <h3>PATH E: Federated Queries</h3>
+                    <p><strong>Q:</strong> "HR employees earning $140k+ with claim totals?"</p>
+                    <p><strong>Solution:</strong> Query HR (PostgreSQL) + Claims (SQL Server) in parallel</p>
+                    <p><strong>Merge:</strong> Python pandas joins on emp_id</p>
+                    <p><strong>Why:</strong> SQL can't join across different servers</p>
+                </div>
+
+                <div class="card">
+                    <h3>7-Tier Model Cascade</h3>
+                    <p><strong>Tier 1:</strong> Claude Sonnet (Elite)</p>
+                    <p><strong>Tier 2:</strong> Gemini Flash (Fast)</p>
+                    <p><strong>Tier 3+:</strong> Qwen, DeepSeek, Gemma (Local, Free)</p>
+                    <p><strong>Strategy:</strong> Free local → cloud → never crash</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 9: Summary -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>5 Paths. One Smart System.</h2>
+            <div class="slide-number">9/9</div>
+        </div>
+        <div class="slide-content">
+            <div style="background: #F5F5F5; padding: 15px; border-radius: 6px; font-size: 12px; color: #2C3E50; line-height: 1.7;">
+                <p><strong>PATH A:</strong> Direct execution (most common)</p>
+                <p><strong>PATH B:</strong> Context-aware follow-ups</p>
+                <p><strong>PATH C:</strong> Memory hits (reuse proven SQL)</p>
+                <p><strong>PATH D:</strong> Model cascade (auto-escalate on failure)</p>
+                <p><strong>PATH E:</strong> Federated joins (cross-database queries)</p>
+            </div>
+
+            <div style="background: #F0FDF4; border-left: 4px solid #137333; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 12px; color: #137333;">
+                <strong>Result:</strong> A RAG system that learns, remembers, routes intelligently, scales across databases, and never crashes. Built in 4 weeks on my local Windows 11 PC with RTX 3060 GPU.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CONTROLS - FIXED AT BOTTOM -->
+<div class="controls-wrapper">
+    <button id="prevBtn" onclick="changeSlide(-1)">← Previous</button>
+    <div class="dots" id="dotsContainer"></div>
+    <div class="slide-counter"><span id="slideNum">1</span> / 9</div>
+    <button id="nextBtn" onclick="changeSlide(1)">Next →</button>
+</div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+
+    function showSlide(n) {
+        slides.forEach(slide => slide.classList.remove('active'));
+        slides[n].classList.add('active');
+        document.getElementById('slideNum').textContent = n + 1;
+
+        document.querySelectorAll('.dot').forEach((dot, idx) => {
+            dot.classList.toggle('active', idx === n);
+        });
+
+        document.getElementById('prevBtn').disabled = n === 0;
+        document.getElementById('nextBtn').disabled = n === totalSlides - 1;
+    }
+
+    function changeSlide(direction) {
+        currentSlide += direction;
+        if (currentSlide < 0) currentSlide = 0;
+        if (currentSlide >= totalSlides) currentSlide = totalSlides - 1;
+        showSlide(currentSlide);
+    }
+
+    const dotsContainer = document.getElementById('dotsContainer');
+    for (let i = 0; i < totalSlides; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (i === 0 ? ' active' : '');
+        dot.onclick = () => {
+            currentSlide = i;
+            showSlide(i);
+        };
+        dotsContainer.appendChild(dot);
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') changeSlide(-1);
+        if (e.key === 'ArrowRight') changeSlide(1);
+    });
+
+    showSlide(0);
+</script>
+
+</body>
+</html>

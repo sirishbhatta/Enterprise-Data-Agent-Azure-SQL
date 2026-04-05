@@ -197,7 +197,7 @@
       "vector_to_sparsevec",
       "vector_typmod_in"
     ],
-    "discovered_at": "2026-03-30 18:59:24",
+    "discovered_at": "2026-04-02 11:47:54",
     "error": null
   },
   "claims": {
@@ -306,7 +306,7 @@
     },
     "views": [],
     "procedures": [],
-    "discovered_at": "2026-03-30 18:59:42",
+    "discovered_at": "2026-04-02 11:48:06",
     "error": null
   },
   "mysql_app": {

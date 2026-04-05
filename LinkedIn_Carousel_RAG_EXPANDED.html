@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3rd Post: RAG Agent Architecture - Expanded</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0F1419 0%, #1a3a4a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .carousel-container {
+            width: 100%;
+            max-width: 100%;
+            height: 100vh;
+            max-height: 100vh;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+            animation: slideIn 0.5s ease-in-out;
+            flex-direction: column;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* TITLE SLIDES */
+        .slide.title-slide {
+            background: linear-gradient(135deg, #0F1419 0%, #1a3a4a 100%);
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        .slide.title-slide::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 12px;
+            height: 100%;
+            background: #00A896;
+        }
+
+        .slide.title-slide .slide-number {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #00A896;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .slide.title-slide h1 {
+            color: #FFFFFF;
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .slide.title-slide p {
+            color: #F5F5F5;
+            font-size: 24px;
+            font-weight: 300;
+            line-height: 1.4;
+        }
+
+        /* CONTENT SLIDES */
+        .slide.content-slide {
+            background: #FFFFFF;
+        }
+
+        .slide.content-slide::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 12px;
+            height: 100%;
+            background: #00A896;
+        }
+
+        .slide-header {
+            background: #0F1419;
+            color: #FFFFFF;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #00A896;
+            flex-shrink: 0;
+        }
+
+        .slide-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .slide-header .slide-number {
+            color: #00A896;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .slide-content {
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            font-size: 14px;
+        }
+
+        /* BLUEPRINT FLOW */
+        .blueprint-flow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+
+        .flow-box {
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 120px;
+            white-space: nowrap;
+        }
+
+        .flow-box.teal {
+            background: #00A896;
+            color: #FFFFFF;
+        }
+
+        .flow-box.gold {
+            background: #F9AB00;
+            color: #0F1419;
+        }
+
+        .flow-box.charcoal {
+            background: #2C3E50;
+            color: #FFFFFF;
+        }
+
+        .flow-arrow {
+            color: #0F1419;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .blueprint-desc {
+            background: #F5F5F5;
+            padding: 15px;
+            border-radius: 6px;
+            color: #2C3E50;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 15px;
+        }
+
+        .blueprint-desc ol {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+
+        .blueprint-desc li {
+            margin-bottom: 4px;
+        }
+
+        /* PATH STEPS */
+        .path-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .step {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px;
+            background: #F5F5F5;
+            border-radius: 6px;
+        }
+
+        .step-num {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #00A896;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-label {
+            font-weight: 700;
+            font-size: 12px;
+            color: #0F1419;
+            margin-bottom: 3px;
+        }
+
+        .step-desc {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+
+        .step-example {
+            font-size: 11px;
+            color: #00A896;
+            font-family: monospace;
+            font-style: italic;
+        }
+
+        /* SIMILARITY BARS */
+        .similarity-item {
+            margin-bottom: 15px;
+        }
+
+        .similarity-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #0F1419;
+        }
+
+        .similarity-bar {
+            height: 12px;
+            background: #E8E8E8;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .similarity-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.3s;
+        }
+
+        .similarity-fill.high {
+            background: #137333;
+            width: 94%;
+        }
+
+        .similarity-fill.med {
+            background: #F9AB00;
+            width: 81%;
+        }
+
+        .similarity-fill.low {
+            background: #F9AB00;
+            width: 42%;
+        }
+
+        .similarity-fill.verylow {
+            background: #EA4335;
+            width: 8%;
+        }
+
+        /* EVOLUTION */
+        .evolution-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .evo-item {
+            background: #F5F5F5;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #00A896;
+        }
+
+        .evo-week {
+            font-weight: 700;
+            font-size: 12px;
+            color: #00A896;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .evo-title {
+            font-weight: 700;
+            font-size: 13px;
+            color: #0F1419;
+            margin-bottom: 4px;
+        }
+
+        .evo-desc {
+            font-size: 11px;
+            color: #666;
+        }
+
+        /* MODELS TABLE */
+        .models-table {
+            width: 100%;
+            font-size: 11px;
+            border-collapse: collapse;
+        }
+
+        .models-table th {
+            background: #0F1419;
+            color: #FFFFFF;
+            padding: 8px;
+            text-align: left;
+            font-weight: 700;
+        }
+
+        .models-table td {
+            padding: 8px;
+            border-bottom: 1px solid #E8E8E8;
+        }
+
+        .models-table tr:nth-child(even) {
+            background: #F5F5F5;
+        }
+
+        .tier-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .tier-elite {
+            background: #FFE5B4;
+            color: #B45309;
+        }
+
+        .tier-fast {
+            background: #D4E8FF;
+            color: #1a73e8;
+        }
+
+        .tier-local {
+            background: #D4F4DD;
+            color: #137333;
+        }
+
+        /* GRID LAYOUTS */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .card {
+            background: #F5F5F5;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #00A896;
+        }
+
+        .card h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0F1419;
+            margin-bottom: 8px;
+        }
+
+        .card p {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        /* CONTROLS - BOTTOM */
+        .controls-wrapper {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 20, 25, 0.95);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            z-index: 1000;
+            border-top: 1px solid #00A896;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #00A896;
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #008878;
+        }
+
+        button:disabled {
+            background: #CCCCCC;
+            cursor: not-allowed;
+        }
+
+        .slide-counter {
+            color: #00A896;
+            font-weight: bold;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .dots {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .dot.active {
+            background: #00A896;
+        }
+
+        /* MOBILE OPTIMIZATION */
+        @media (max-width: 768px) {
+            .slide.title-slide h1 {
+                font-size: 36px;
+            }
+
+            .slide.title-slide p {
+                font-size: 18px;
+            }
+
+            .slide-header h2 {
+                font-size: 22px;
+            }
+
+            .blueprint-flow {
+                font-size: 10px;
+            }
+
+            .flow-box {
+                padding: 10px 12px;
+                font-size: 10px;
+                min-width: 100px;
+            }
+
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .controls-wrapper {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="carousel-container">
+    <!-- SLIDE 1: Title -->
+    <div class="slide title-slide active">
+        <div class="slide-number">1/9</div>
+        <h1>3rd Post: RAG Agent Architecture</h1>
+        <p>How AI learns from feedback and reuses past wins. 5 query paths explained.</p>
+    </div>
+
+    <!-- SLIDE 2: Blueprint -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>The Multi-Agent Blueprint</h2>
+            <div class="slide-number">2/9</div>
+        </div>
+        <div class="slide-content">
+            <div class="blueprint-flow">
+                <div class="flow-box teal">User Question</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box gold">Vector Memory</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box charcoal">Supervisor AI</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box teal">Results</div>
+            </div>
+            <div class="blueprint-desc">
+                <strong>What happens:</strong>
+                <ol>
+                    <li>Question embedded as 768 numbers</li>
+                    <li>Search past successes (cosine similarity)</li>
+                    <li>Route to correct database</li>
+                    <li>Execute query with memory hints</li>
+                    <li>Return results + AI summary</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: PATH A - Detailed -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>PATH A: Simple Question, Direct Hit</h2>
+            <div class="slide-number">3/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #666; font-size: 12px; margin-bottom: 12px;"><em>Example: "What is the average salary by department?" (first time, no history)</em></p>
+            <div class="path-steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-content">
+                        <div class="step-label">User types question</div>
+                        <div class="step-desc">Enters text in the chat input at the bottom</div>
+                        <div class="step-example">"What is the average salary by department?"</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-content">
+                        <div class="step-label">rewrite_query()</div>
+                        <div class="step-desc">No history → returns question unchanged</div>
+                        <div class="step-example">Returns as-is</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-content">
+                        <div class="step-label">check_vector_memory()</div>
+                        <div class="step-desc">Search SQL Server for similar past questions (≥65% match)</div>
+                        <div class="step-example">No match found → no hint provided</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div class="step-content">
+                        <div class="step-label">supervisor_routing()</div>
+                        <div class="step-desc">AI reads the question and picks a domain</div>
+                        <div class="step-example">Returns "HR"</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">5</div>
+                    <div class="step-content">
+                        <div class="step-label">agent_execution()</div>
+                        <div class="step-desc">AI generates SQL using the schema. Runs it on the database.</div>
+                        <div class="step-example">SELECT department, AVG(salary)...</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">6</div>
+                    <div class="step-content">
+                        <div class="step-label">Display Results</div>
+                        <div class="step-desc">AI writes a 2-3 bullet summary. Table shown below it.</div>
+                        <div class="step-example">DataFrame + metrics shown</div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">7</div>
+                    <div class="step-content">
+                        <div class="step-label">👍 Feedback</div>
+                        <div class="step-desc">If thumbs up → embeds question+SQL into vector memory</div>
+                        <div class="step-example">Now stored for future use as a hint</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: Cosine Distance / Similarity -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>Memory Search: Cosine Distance</h2>
+            <div class="slide-number">4/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #666; font-size: 12px; margin-bottom: 12px;">
+                How the system finds similar past questions: converts both to 768-dimensional vectors, measures angle (cosine distance). Result: 0 = identical, 1 = completely different.
+            </p>
+
+            <p style="color: #0F1419; font-weight: 700; font-size: 12px; margin: 12px 0 8px;">
+                Example similarity scores against "average salary by department":
+            </p>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"What is the mean salary grouped by department?"</span>
+                    <span style="color: #137333; font-weight: 700;">94%</span>
+                </div>
+                <div class="similarity-bar">
+                    <div class="similarity-fill high"></div>
+                </div>
+            </div>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"Show me salaries for each team"</span>
+                    <span style="color: #137333; font-weight: 700;">81%</span>
+                </div>
+                <div class="similarity-bar">
+                    <div class="similarity-fill high" style="width: 81%;"></div>
+                </div>
+            </div>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"Who are the top 3 providers by billed amount?"</span>
+                    <span style="color: #F9AB00; font-weight: 700;">42%</span>
+                </div>
+                <div class="similarity-bar">
+                    <div class="similarity-fill low"></div>
+                </div>
+            </div>
+
+            <div class="similarity-item">
+                <div class="similarity-label">
+                    <span>"What is the weather in New York?"</span>
+                    <span style="color: #EA4335; font-weight: 700;">8%</span>
+                </div>
+                <div class="similarity-bar">
+                    <div class="similarity-fill verylow"></div>
+                </div>
+            </div>
+
+            <div style="background: #FFF8E1; border-left: 4px solid #F9AB00; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 11px; color: #B45309;">
+                <strong>Thresholds:</strong> Memory hint triggers at ≥65% | Skip duplicate save at ≥95%
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: Evolution -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>Evolution: pgvector → SQL Server 2025</h2>
+            <div class="slide-number">5/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #666; font-size: 12px; margin-bottom: 12px;">The vector memory system evolved over 12 weeks:</p>
+
+            <div class="evolution-timeline">
+                <div class="evo-item">
+                    <div class="evo-week">Week 1</div>
+                    <div class="evo-title">No Memory</div>
+                    <div class="evo-desc">Every question treated as brand new. AI regenerates SQL from scratch every time.</div>
+                </div>
+
+                <div class="evo-item">
+                    <div class="evo-week">Week 4</div>
+                    <div class="evo-title">JSON File Memory</div>
+                    <div class="evo-desc">Past queries saved to JSON. Simple text matching only — "average salary" ≠ "mean pay". No semantic understanding.</div>
+                </div>
+
+                <div class="evo-item">
+                    <div class="evo-week">Week 8</div>
+                    <div class="evo-title">pgvector (PostgreSQL)</div>
+                    <div class="evo-desc">Installed pgvector extension. Manual table + index setup. Worked but required separate PostgreSQL step.</div>
+                </div>
+
+                <div class="evo-item" style="border-left-color: #00A896; background: #F0FDF4;">
+                    <div class="evo-week" style="color: #137333;">Week 12 ✅</div>
+                    <div class="evo-title">SQL Server 2025 Native Vectors</div>
+                    <div class="evo-desc">VECTOR(768) is now a native data type. No extension needed. HealthcareClaims database now holds AI memory in ai_query_cache table.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Paths B + C -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>PATH B: Rewrite | PATH C: Memory Hit</h2>
+            <div class="slide-number">6/9</div>
+        </div>
+        <div class="slide-content">
+            <div class="grid-2">
+                <div class="card">
+                    <h3>PATH B: Follow-Up (Rewrite)</h3>
+                    <p><strong>Scenario:</strong> User asks "what about just Sales?" after previous question.</p>
+                    <p><strong>Solution:</strong> AI detects follow-up, expands context. "What about just Sales?" → "What is average salary for Sales department?"</p>
+                    <p><strong>Why:</strong> Prevents AI from getting confused by out-of-context questions.</p>
+                </div>
+
+                <div class="card">
+                    <h3>PATH C: Memory Hit</h3>
+                    <p><strong>Scenario:</strong> User asked "top 3 providers by billing" before and gave 👍. Now asks "leading providers by revenue?"</p>
+                    <p><strong>Solution:</strong> Vector search finds 87% match. Past SQL injected as hint.</p>
+                    <p><strong>Result:</strong> Faster, more accurate. Badge shows "Memory Hit 87%"</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: Paths D + E -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>PATH D: Cascade | PATH E: Federated</h2>
+            <div class="slide-number">7/9</div>
+        </div>
+        <div class="slide-content">
+            <div class="grid-2">
+                <div class="card">
+                    <h3>PATH D: Model Cascade</h3>
+                    <p><strong>Problem:</strong> Local AI (gemma3:12b) generates bad SQL with syntax error.</p>
+                    <p><strong>Solution:</strong> Auto-escalates to next tier in cascade list.</p>
+                    <p><strong>Result:</strong> Tries gemini-2.5-flash → succeeds. Badge: "After 1 retry (gemini)"</p>
+                    <p><strong>Why:</strong> System never crashes. Always finds a working model.</p>
+                </div>
+
+                <div class="card">
+                    <h3>PATH E: Federated Query</h3>
+                    <p><strong>Problem:</strong> Question needs HR data (PostgreSQL) + Claims data (SQL Server cloud).</p>
+                    <p><strong>Solution:</strong> Generate 2 queries, run parallel, merge in Python (pandas).</p>
+                    <p><strong>Result:</strong> Single unified table with data from both databases.</p>
+                    <p><strong>Why:</strong> SQL can't natively join across different servers.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 8: AI Models & Cascade -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>AI Models & Cascade Strategy</h2>
+            <div class="slide-number">8/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #666; font-size: 12px; margin-bottom: 12px;">7-tier cascade: [Selected] → Gemini Flash → Claude Sonnet → Qwen → DeepSeek → Gemma</p>
+
+            <table class="models-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Tier</th>
+                        <th>Cost</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>claude-sonnet-4-6</strong></td>
+                        <td><span class="tier-badge tier-elite">Elite</span></td>
+                        <td>💰💰</td>
+                        <td>Complex reasoning</td>
+                    </tr>
+                    <tr>
+                        <td><strong>gemini-2.5-flash</strong></td>
+                        <td><span class="tier-badge tier-fast">Fast</span></td>
+                        <td>💰</td>
+                        <td>Fallback workhorse</td>
+                    </tr>
+                    <tr>
+                        <td><strong>qwen2.5-coder</strong></td>
+                        <td><span class="tier-badge tier-local">Local</span></td>
+                        <td>Free</td>
+                        <td>SQL generation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>deepseek-r1</strong></td>
+                        <td><span class="tier-badge tier-local">Local</span></td>
+                        <td>Free</td>
+                        <td>Step-by-step reasoning</td>
+                    </tr>
+                    <tr>
+                        <td><strong>gemma3:12b</strong></td>
+                        <td><span class="tier-badge tier-local">Local</span></td>
+                        <td>Free</td>
+                        <td>Final fallback (RTX 3060)</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="font-size: 11px; color: #666; margin-top: 12px;">
+                Strategy: Try free local models first → fallback to cloud APIs → never crash
+            </p>
+        </div>
+    </div>
+
+    <!-- SLIDE 9: Summary -->
+    <div class="slide content-slide">
+        <div class="slide-header">
+            <h2>The Complete Picture</h2>
+            <div class="slide-number">9/9</div>
+        </div>
+        <div class="slide-content">
+            <p style="color: #0F1419; font-size: 13px; font-weight: 700; margin-bottom: 12px;">
+                A RAG Agent with 5 Intelligent Paths
+            </p>
+
+            <div style="background: #F5F5F5; padding: 15px; border-radius: 6px; font-size: 12px; color: #2C3E50; line-height: 1.6;">
+                <p><strong>PATH A:</strong> Simple questions → direct execution (most common)</p>
+                <p><strong>PATH B:</strong> Follow-ups → AI expands context from history</p>
+                <p><strong>PATH C:</strong> Familiar questions → vector memory finds & reuses past SQL (faster)</p>
+                <p><strong>PATH D:</strong> Model fails → cascade escalates to next tier (resilience)</p>
+                <p><strong>PATH E:</strong> Multi-database → federated join in Python (cross-server queries)</p>
+            </div>
+
+            <div style="background: #F0FDF4; border-left: 4px solid #137333; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 12px; color: #137333;">
+                <strong>Result:</strong> A system that learns, remembers, routes intelligently, scales across databases, and never crashes.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CONTROLS - FIXED AT BOTTOM -->
+<div class="controls-wrapper">
+    <button id="prevBtn" onclick="changeSlide(-1)">← Previous</button>
+    <div class="dots" id="dotsContainer"></div>
+    <div class="slide-counter"><span id="slideNum">1</span> / 9</div>
+    <button id="nextBtn" onclick="changeSlide(1)">Next →</button>
+</div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+
+    function showSlide(n) {
+        slides.forEach(slide => slide.classList.remove('active'));
+        slides[n].classList.add('active');
+        document.getElementById('slideNum').textContent = n + 1;
+
+        document.querySelectorAll('.dot').forEach((dot, idx) => {
+            dot.classList.toggle('active', idx === n);
+        });
+
+        document.getElementById('prevBtn').disabled = n === 0;
+        document.getElementById('nextBtn').disabled = n === totalSlides - 1;
+    }
+
+    function changeSlide(direction) {
+        currentSlide += direction;
+        if (currentSlide < 0) currentSlide = 0;
+        if (currentSlide >= totalSlides) currentSlide = totalSlides - 1;
+        showSlide(currentSlide);
+    }
+
+    const dotsContainer = document.getElementById('dotsContainer');
+    for (let i = 0; i < totalSlides; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (i === 0 ? ' active' : '');
+        dot.onclick = () => {
+            currentSlide = i;
+            showSlide(i);
+        };
+        dotsContainer.appendChild(dot);
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') changeSlide(-1);
+        if (e.key === 'ArrowRight') changeSlide(1);
+    });
+
+    showSlide(0);
+</script>
+
+</body>
+</html>
