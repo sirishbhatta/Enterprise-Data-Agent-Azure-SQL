@@ -11,10 +11,10 @@ import os
 import json
 import pandas as pd
 from pathlib import Path
+from urllib.parse import quote_plus
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text, inspect as sa_inspect
 from sqlalchemy.pool import NullPool
-import pyodbc
 
 load_dotenv()
 
@@ -41,11 +41,15 @@ def build_engine():
         raise ValueError("SQL_USER and SQL_PASSWORD environment variables not set")
 
     # Azure SQL connection string
+    # - Driver 18 is the version pre-installed on Azure App Service Linux (Python 3.12)
+    # - quote_plus encodes special chars in password (e.g. @, #, !) so URL doesn't break
+    # - Driver 18 encrypts by default (good for Azure); TrustServerCertificate=no is safe
     connection_string = (
-        f"mssql+pyodbc://{SQL_USER}:{SQL_PASSWORD}"
+        f"mssql+pyodbc://{SQL_USER}:{quote_plus(SQL_PASSWORD)}"
         f"@{SQL_SERVER}/{SQL_DATABASE}"
-        f"?driver=ODBC+Driver+17+for+SQL+Server"
-        f"&TrustServerCertificate=yes"
+        f"?driver=ODBC+Driver+18+for+SQL+Server"
+        f"&Encrypt=yes"
+        f"&TrustServerCertificate=no"
         f"&Connection+Timeout=30"
     )
 
