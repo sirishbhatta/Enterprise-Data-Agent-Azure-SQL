@@ -57,7 +57,8 @@ if "query_history" not in st.session_state:
 # ─────────────────────────────────────────────────────────────────────────────
 # Page Layout
 # ─────────────────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="BI Agent - Azure SQL", layout="wide")
+# NOTE: st.set_page_config is NOT called here — it is already set in app.py.
+# Calling it a second time would crash Streamlit immediately.
 
 st.title("📊 BI Agent — Azure SQL")
 st.markdown("Ask questions about your data. The AI will generate SQL and fetch results.")
@@ -94,8 +95,8 @@ SQL:"""
 
 def generate_sql_with_gemini(user_question: str, schema_info: str) -> str:
     """Fallback: Use Gemini to generate SQL."""
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    # Using google-genai (new library) — Client-based API, not genai.configure()
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     prompt = f"""You are a SQL expert. Generate ONLY valid SQL SELECT statements.
 
@@ -106,7 +107,7 @@ User Question: {user_question}
 
 Return ONLY the SQL code, no explanations."""
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
     return response.text.strip()
 
 # ─────────────────────────────────────────────────────────────────────────────
