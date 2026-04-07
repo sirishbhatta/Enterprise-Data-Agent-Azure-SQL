@@ -94,7 +94,7 @@ gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 # --- 2. VECTOR MEMORY (Azure SQL) ---
 # Memory stores question+SQL pairs so the app learns from past queries.
 # Think of it like a query cache in SQL: "we've seen this question before, here's what worked."
-# All memory lives in a table called AgentMemory inside your Azure SQL database.
+# Uses the existing ai_query_cache table: (id, user_question, sql_code, question_embedding, created_at)
 
 from sqlalchemy import text as _sql_text
 
@@ -110,58 +110,32 @@ def _get_memory_engine():
     except Exception:
         return None
 
-def _ensure_memory_table():
-    """Create AgentMemory table if it doesn't already exist (safe to call every startup)."""
-    engine = _get_memory_engine()
-    if not engine:
-        return
-    try:
-        with engine.begin() as conn:
-            conn.execute(_sql_text("""
-                IF NOT EXISTS (
-                    SELECT 1 FROM sysobjects WHERE name='AgentMemory' AND xtype='U'
-                )
-                CREATE TABLE AgentMemory (
-                    id          INT IDENTITY(1,1) PRIMARY KEY,
-                    question    NVARCHAR(MAX),
-                    sql_query   NVARCHAR(MAX),
-                    domain      NVARCHAR(100),
-                    feedback    INT DEFAULT 1,
-                    created_at  DATETIME DEFAULT GETDATE()
-                )
-            """))
-    except Exception:
-        pass  # Non-fatal: app works even if memory table can't be created
-
 def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) -> bool:
-    """Save a successful question+SQL pair to Azure SQL memory table."""
+    """Save a thumbs-up question+SQL pair into the existing ai_query_cache table."""
     engine = _get_memory_engine()
     if not engine:
         return False
     try:
         with engine.begin() as conn:
             conn.execute(_sql_text("""
-                INSERT INTO AgentMemory (question, sql_query, domain, feedback)
-                VALUES (:q, :s, :d, :f)
-            """), {"q": question[:2000], "s": sql[:4000], "d": domain, "f": feedback})
+                INSERT INTO ai_query_cache (user_question, sql_code, created_at)
+                VALUES (:q, :s, GETDATE())
+            """), {"q": question[:500], "s": sql})
         return True
     except Exception:
         return False
 
 def get_memory_count() -> int:
-    """Return how many memories are stored in Azure SQL."""
+    """Return how many memories are stored in ai_query_cache."""
     engine = _get_memory_engine()
     if not engine:
         return 0
     try:
         with engine.connect() as conn:
-            result = conn.execute(_sql_text("SELECT COUNT(*) FROM AgentMemory"))
+            result = conn.execute(_sql_text("SELECT COUNT(*) FROM ai_query_cache"))
             return result.scalar() or 0
     except Exception:
         return 0
-
-# Create the table at startup (no-op if it already exists)
-_ensure_memory_table()
 
 # --- 2b. PAGE CONFIGURATION & STYLING ---
 # st.set_page_config is handled by app.py (the navigation entry point)
