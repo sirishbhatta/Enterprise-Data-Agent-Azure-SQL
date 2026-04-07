@@ -1,21 +1,24 @@
-﻿"""
-â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-â•‘  app.py â€” MAIN ENTRY POINT (AZURE SQL ONLY)                                  â•‘
-â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â•‘
-â•‘  Simplified entry point for Azure SQL deployment.                            â•‘
-â•‘                                                                              â•‘
-â•‘  What it does:                                                               â•‘
-â•‘   1. Sets up the page layout (title, icon, sidebar)                          â•‘
-â•‘   2. Draws the sidebar â€” branding, Azure SQL status                          â•‘
-â•‘   3. Loads the BI Dashboard page                                             â•‘
-â•‘                                                                              â•‘
-â•‘  How to run:                                                                 â•‘
-â•‘    streamlit run app.py --server.port 8080                                   â•‘
-â•‘                                                                              â•‘
-â•‘  File relationships:                                                         â•‘
-â•‘    app.py  â”€â”€â–º  bi_dashboard.py     (the main AI chat page)                  â•‘
-â•‘    Both share:  db_connector.py     (Azure SQL connector)                     â•‘
-â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  app.py — MAIN ENTRY POINT                                                   ║
+║  ─────────────────────────────────────────────────────────────────────────── ║
+║  This is the FIRST file Streamlit runs. Think of it as the "front door"      ║
+║  of the whole application.                                                   ║
+║                                                                              ║
+║  What it does:                                                               ║
+║   1. Sets up the page layout (title, icon, sidebar)                          ║
+║   2. Draws the sidebar — branding, DB status pills, navigation links         ║
+║   3. Defines which pages exist (BI Dashboard + Connection Manager)           ║
+║   4. Hands off to whichever page the user clicked                            ║
+║                                                                              ║
+║  How to run:                                                                 ║
+║    streamlit run app.py --server.port 8502                                   ║
+║                                                                              ║
+║  File relationships:                                                         ║
+║    app.py  ──►  bi_dashboard.py        (the main AI chat page)               ║
+║            ──►  pages/1_Connection_Manager.py  (DB settings page)            ║
+║    Both pages share:  db_connector.py  (the database brain)                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
 import streamlit as st
@@ -25,26 +28,28 @@ from pathlib import Path
 # sys.path.insert tells Python WHERE to look for modules.
 # Without this, "import db_connector" would fail because Python doesn't
 # automatically search the current project folder in all configurations.
-sys.path.insert(0, str(Path(__file__).parent))
+project_root = Path(__file__).resolve().parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 import db_connector as dbc
 
-# â”€â”€ Single page config for the whole app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Single page config for the whole app ─────────────────────────────────────
 # IMPORTANT: st.set_page_config must be the VERY FIRST Streamlit call.
-# It can only be called ONCE â€” that's why it lives here in app.py and
+# It can only be called ONCE — that's why it lives here in app.py and
 # NOT in the sub-pages. Setting it here applies it to all pages.
 st.set_page_config(
-    page_title="BI Engine â€” Sirish Bhatta",
-    page_icon="âœ¨",
+    page_title="BI Engine — Sirish Bhatta",
+    page_icon="✨",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# â”€â”€ Sidebar branding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Sidebar branding ─────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
     <div style="padding: 18px 4px 8px 4px;">
         <div style="font-size:1.35rem; font-weight:800; color:#1a73e8; letter-spacing:-0.5px;">
-            âœ¨ Multi-Agent BI
+            ✨ Multi-Agent BI
         </div>
         <div style="font-size:0.78rem; color:#5f6368; margin-top:3px;">
             by <b>Sirish Bhatta</b>
@@ -76,38 +81,64 @@ with st.sidebar:
         </style>
     """, unsafe_allow_html=True)
 
-    # Azure SQL Status
-    st.markdown("<div style='font-size:0.72rem; font-weight:700; color:#5f6368; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;'>Database</div>", unsafe_allow_html=True)
-
-    # Check connection status
-    try:
-        is_connected = dbc.test_connection()
-        status_color = "#137333" if is_connected else "#c5221f"
-        status_text = "âœ… Connected" if is_connected else "âŒ Disconnected"
-    except Exception as e:
-        status_color = "#c5221f"
-        status_text = "âŒ Error"
-
-    st.markdown(f"<span style='background:#e6f4ea;color:{status_color};padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;'>{status_text}</span>", unsafe_allow_html=True)
-    st.markdown(f"<div style='font-size:0.7rem; color:#5f6368; margin-top:6px;'>Azure SQL<br/>sirish_azure_sql_db</div>", unsafe_allow_html=True)
+    # Live DB status pills — read directly from db_registry.yaml so they
+    # always reflect the current state without any manual updates needed.
+    enabled_dbs = dbc.get_enabled_databases()
+    if enabled_dbs:
+        st.markdown("<div style='font-size:0.72rem; font-weight:700; color:#5f6368; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;'>Active Databases</div>", unsafe_allow_html=True)
+        db_type_colors = {
+            "postgresql": ("#e8f0fe", "#1a73e8"),
+            "mssql":      ("#fce8e6", "#c5221f"),
+            "oracle":     ("#fef3e2", "#e37400"),
+            "mysql":      ("#e6f4ea", "#137333"),
+            "sqlite":     ("#f3e8fd", "#7b1fa2"),
+            "duckdb":     ("#e8f5e9", "#2e7d32"),
+            "snowflake":  ("#e3f2fd", "#1565c0"),
+            "bigquery":   ("#e8f0fe", "#4285f4"),
+        }
+        pills_html = ""
+        for db_key, db_cfg in enabled_dbs.items():
+            db_type = db_cfg.get("type", "db")
+            bg, fg  = db_type_colors.get(db_type, ("#f1f3f4", "#3c4043"))
+            label   = db_cfg.get("name", db_key)
+            pills_html += f"<span style='background:{bg};color:{fg};padding:3px 9px;border-radius:20px;font-size:0.72rem;font-weight:600;margin:2px 2px;display:inline-block;'>{label}</span>"
+        st.markdown(f"<div style='margin-bottom:14px;line-height:2'>{pills_html}</div>", unsafe_allow_html=True)
 
     st.markdown("<hr style='border:none; border-top:1px solid #e8eaed; margin-bottom:4px;'>", unsafe_allow_html=True)
 
-# â”€â”€ Page definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Page definitions ─────────────────────────────────────────────────────────
+# st.Page() registers a Python file as a navigable page.
+# default=True means this page loads when the app first opens.
 dashboard_page = st.Page(
     "bi_dashboard.py",
     title="BI Dashboard",
-    icon="ðŸ“Š",
+    icon="📊",
     default=True,
 )
 
-# â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+connection_page = st.Page(
+    "pages/1_Connection_Manager.py",
+    title="Connection Manager",
+    icon="🔌",
+)
+
+reports_page = st.Page(
+    "pages/2_Scheduled_Reports.py",
+    title="Scheduled Reports",
+    icon="📅",
+)
+
+# ── Navigation ────────────────────────────────────────────────────────────────
+# st.navigation() builds the sidebar menu. Pages are grouped under section
+# headers ("🤖 AI Agent", "⚙️ Settings"). When the user clicks a link,
+# Streamlit re-runs this script and pg.run() executes the selected page file.
 pg = st.navigation(
     {
-        "ðŸ¤– AI Agent": [dashboard_page],
+        "🤖 AI Agent": [dashboard_page],
+        "⚙️ Settings": [connection_page, reports_page],
     },
     position="sidebar",
     expanded=True,
 )
 
-pg.run()
+pg.run()  # Execute whichever page the user navigated to
