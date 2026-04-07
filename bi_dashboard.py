@@ -110,6 +110,16 @@ def _get_memory_engine():
     except Exception:
         return None
 
+def _set_debug_error(label: str, err: Exception):
+    """Persist an error into session state so the sidebar can display it permanently."""
+    import traceback
+    st.session_state["_debug_error"] = (
+        f"[{label}]\n"
+        f"Type : {type(err).__name__}\n"
+        f"Msg  : {err}\n"
+        f"Trace: {traceback.format_exc()}"
+    )
+
 def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) -> bool:
     """Save a thumbs-up question+SQL pair into the existing ai_query_cache table.
 
@@ -122,8 +132,6 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
         because pyodbc can't bind a string parameter into a CAST for custom types.
         Instead, we pass the JSON array string directly — Azure SQL implicitly
         converts it to VECTOR(768, float32) based on the column type.
-        SQL analogy: same as INSERT INTO t (dt_col) VALUES (:str) where dt_col is
-        DATETIME — SQL Server handles the implicit conversion from the string.
     """
     engine = _get_memory_engine()
     if not engine:
@@ -133,6 +141,12 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
     # text-embedding-004 outputs exactly 768 floats — matches VECTOR(768, float32).
     # This is the cloud equivalent of nomic-embed-text (local Ollama model).
     # GOOGLE_API_KEY is already set in Azure — no extra credential needed.
+    #
+    # EmbedContentResponse has TWO possible shapes depending on SDK version:
+    #   - response.embeddings  → list[ContentEmbedding]   (batch response)
+    #   - response.embedding   → ContentEmbedding          (single response)
+    # Both ContentEmbedding objects have a .values field = list[float].
+    # We check both so we don't crash if the shape changes between SDK versions.
     embedding_json = None
     if gemini_client:
         try:
@@ -140,11 +154,21 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
                 model="text-embedding-004",
                 contents=question[:500],
             )
-            embedding_vector = emb_response.embeddings[0].values  # list of 768 floats
-            embedding_json = json.dumps(embedding_vector)
+            # Try batch shape first, then singular shape
+            if hasattr(emb_response, "embeddings") and emb_response.embeddings:
+                embedding_vector = emb_response.embeddings[0].values
+            elif hasattr(emb_response, "embedding") and emb_response.embedding:
+                embedding_vector = emb_response.embedding.values
+            else:
+                raise ValueError(
+                    f"No embedding found in response. "
+                    f"Available attrs: {[a for a in dir(emb_response) if not a.startswith('_')]}"
+                )
+            if not embedding_vector:
+                raise ValueError("Embedding values list is empty or None")
+            embedding_json = json.dumps(list(embedding_vector))
         except Exception as embed_err:
-            # Show a toast so the error is visible instead of silent
-            st.toast(f"⚠️ Embedding failed: {embed_err}", icon="⚠️")
+            _set_debug_error("EMBED", embed_err)
 
     try:
         with engine.begin() as conn:
@@ -162,7 +186,7 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
                 """), {"q": question[:500], "s": sql})
         return True
     except Exception as save_err:
-        st.toast(f"⚠️ Memory save failed: {save_err}", icon="⚠️")
+        _set_debug_error("SQL INSERT", save_err)
         return False
 
 def get_memory_count() -> int:
@@ -477,9 +501,18 @@ with st.sidebar:
     )
 
 
+    # --- Persistent debug error panel ---
+    # Errors from embedding generation or memory save are stored here instead of
+    # disappearing toasts. Click "Clear" when you've read/copied the message.
+    if st.session_state.get("_debug_error"):
+        st.error(st.session_state["_debug_error"])
+        if st.button("✕ Clear error", key="clear_debug_err", use_container_width=True):
+            del st.session_state["_debug_error"]
+            st.rerun()
+
     if st.button(":material/delete: Clear History", use_container_width=True):
         st.session_state.messages = []
-        st.cache_data.clear() 
+        st.cache_data.clear()
         st.rerun()
 
     st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">memory</span> AI Reasoning Engine</div>', unsafe_allow_html=True)
