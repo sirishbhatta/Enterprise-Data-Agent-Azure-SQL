@@ -90,11 +90,10 @@ if "user_query" not in st.session_state:
 
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-# Embedding models (text-embedding-004, embedding-001) only exist in the v1 API.
-# The default SDK client uses v1beta, which returns 404 for embedContent.
-# We create a separate client locked to v1 just for embedding calls.
+# text-embedding-004 lives in v1beta, NOT v1.
+# The default SDK client uses v1beta — we keep it consistent here.
 gemini_embed_client = (
-    genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
+    genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1beta"})
     if GEMINI_API_KEY else None
 )
 
