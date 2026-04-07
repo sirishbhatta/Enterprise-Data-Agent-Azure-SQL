@@ -79,7 +79,8 @@ SQL_USER        = os.getenv("SQL_USER")
 SQL_PASSWORD    = os.getenv("SQL_PASSWORD")
 PG_PASSWORD     = os.getenv("PG_PASSWORD")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY")
+# Azure App Service uses GOOGLE_API_KEY; also accept GEMINI_API_KEY as fallback
+GEMINI_API_KEY    = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 MINIMAX_API_KEY   = os.getenv("MINIMAX_API_KEY")
 
 # Initialize session state
@@ -90,8 +91,125 @@ if "user_query" not in st.session_state:
 
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+# Embedding models (text-embedding-004, embedding-001) only exist in the v1 API.
+# The default SDK client uses v1beta, which returns 404 for embedContent.
+# We create a separate client locked to v1 just for embedding calls.
+gemini_embed_client = (
+    genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
+    if GEMINI_API_KEY else None
+)
 
-# --- 2. PAGE CONFIGURATION & STYLING ---
+# --- 2. VECTOR MEMORY (Azure SQL) ---
+# Memory stores question+SQL pairs so the app learns from past queries.
+# Think of it like a query cache in SQL: "we've seen this question before, here's what worked."
+# Uses the existing ai_query_cache table: (id, user_question, sql_code, question_embedding, created_at)
+
+from sqlalchemy import text as _sql_text
+
+def _get_memory_engine():
+    """Get a SQLAlchemy engine pointing at Azure SQL for memory operations."""
+    try:
+        all_dbs = dbc.get_all_databases()
+        azure_cfg = next((v for v in all_dbs.values() if v.get("type") == "mssql" and v.get("enabled")), None)
+        if not azure_cfg:
+            return None
+        db_key = next(k for k, v in all_dbs.items() if v is azure_cfg)
+        return dbc.build_engine(db_key, azure_cfg)
+    except Exception:
+        return None
+
+def _set_debug_error(label: str, err: Exception):
+    """Persist an error into session state so the sidebar can display it permanently."""
+    import traceback
+    st.session_state["_debug_error"] = (
+        f"[{label}]\n"
+        f"Type : {type(err).__name__}\n"
+        f"Msg  : {err}\n"
+        f"Trace: {traceback.format_exc()}"
+    )
+
+def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) -> bool:
+    """Save a thumbs-up question+SQL pair into the existing ai_query_cache table.
+
+    Also generates a 768-dim embedding via Gemini text-embedding-004 so the
+    question_embedding VECTOR(768, float32) column is populated for future
+    semantic search / memory retrieval.
+
+    Azure SQL VECTOR insertion note:
+        CAST(:vec AS VECTOR(768)) does NOT work with pyodbc parameterized queries
+        because pyodbc can't bind a string parameter into a CAST for custom types.
+        Instead, we pass the JSON array string directly — Azure SQL implicitly
+        converts it to VECTOR(768, float32) based on the column type.
+    """
+    engine = _get_memory_engine()
+    if not engine:
+        return False
+
+    # --- Generate embedding via Gemini text-embedding-004 ---
+    # text-embedding-004 outputs exactly 768 floats — matches VECTOR(768, float32).
+    # This is the cloud equivalent of nomic-embed-text (local Ollama model).
+    # GOOGLE_API_KEY is already set in Azure — no extra credential needed.
+    #
+    # EmbedContentResponse has TWO possible shapes depending on SDK version:
+    #   - response.embeddings  → list[ContentEmbedding]   (batch response)
+    #   - response.embedding   → ContentEmbedding          (single response)
+    # Both ContentEmbedding objects have a .values field = list[float].
+    # We check both so we don't crash if the shape changes between SDK versions.
+    embedding_json = None
+    if gemini_embed_client:
+        try:
+            emb_response = gemini_embed_client.models.embed_content(
+                model="text-embedding-004",  # v1 client — this model exists here
+                contents=question[:500],
+            )
+            # Try batch shape first, then singular shape
+            if hasattr(emb_response, "embeddings") and emb_response.embeddings:
+                embedding_vector = emb_response.embeddings[0].values
+            elif hasattr(emb_response, "embedding") and emb_response.embedding:
+                embedding_vector = emb_response.embedding.values
+            else:
+                raise ValueError(
+                    f"No embedding found in response. "
+                    f"Available attrs: {[a for a in dir(emb_response) if not a.startswith('_')]}"
+                )
+            if not embedding_vector:
+                raise ValueError("Embedding values list is empty or None")
+            embedding_json = json.dumps(list(embedding_vector))
+        except Exception as embed_err:
+            _set_debug_error("EMBED", embed_err)
+
+    try:
+        with engine.begin() as conn:
+            if embedding_json:
+                # Pass the JSON string directly — Azure SQL implicitly converts to VECTOR
+                conn.execute(_sql_text("""
+                    INSERT INTO ai_query_cache (user_question, sql_code, question_embedding, created_at)
+                    VALUES (:q, :s, :vec, GETDATE())
+                """), {"q": question[:500], "s": sql, "vec": embedding_json})
+            else:
+                # Fallback: save without embedding if Gemini call failed
+                conn.execute(_sql_text("""
+                    INSERT INTO ai_query_cache (user_question, sql_code, created_at)
+                    VALUES (:q, :s, GETDATE())
+                """), {"q": question[:500], "s": sql})
+        return True
+    except Exception as save_err:
+        _set_debug_error("SQL INSERT", save_err)
+        return False
+
+def get_memory_count() -> int:
+    """Return how many memories are stored in ai_query_cache."""
+    engine = _get_memory_engine()
+    if not engine:
+        return 0
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(_sql_text("SELECT COUNT(*) FROM ai_query_cache"))
+            return result.scalar() or 0
+    except Exception:
+        return 0
+
+# --- 2b. PAGE CONFIGURATION & STYLING ---
 # st.set_page_config is handled by app.py (the navigation entry point)
 
 st.markdown("""
@@ -388,10 +506,27 @@ with st.sidebar:
         st.metric("📚 Cached Answers", stats["total_cached_questions"])
     except:
         pass  # If vector table doesn't exist yet, just skip
+    # Memory counter — shows how many question+SQL pairs are stored in Azure SQL
+    _mem_count = get_memory_count()
+    st.markdown(
+        f'<div class="api-info"><span class="material-symbols-rounded mat-icon">psychology</span>'
+        f'<b>SQL Brain:</b> {_mem_count} semantic vectors stored</div>',
+        unsafe_allow_html=True
+    )
+
+
+    # --- Persistent debug error panel ---
+    # Errors from embedding generation or memory save are stored here instead of
+    # disappearing toasts. Click "Clear" when you've read/copied the message.
+    if st.session_state.get("_debug_error"):
+        st.error(st.session_state["_debug_error"])
+        if st.button("✕ Clear error", key="clear_debug_err", use_container_width=True):
+            del st.session_state["_debug_error"]
+            st.rerun()
 
     if st.button(":material/delete: Clear History", use_container_width=True):
         st.session_state.messages = []
-        st.cache_data.clear() 
+        st.cache_data.clear()
         st.rerun()
 
     st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">memory</span> AI Reasoning Engine</div>', unsafe_allow_html=True)
@@ -466,6 +601,23 @@ for i, msg in enumerate(st.session_state.messages):
         if msg["role"] == "assistant" and "metadata" in msg:
             feedback_key = f"fb_{i}"
             feedback = st.feedback("thumbs", key=feedback_key)
+            # feedback == 1 means thumbs up.
+            # We use a session_state guard (fb_saved_{i}) to ensure we only save once
+            # per message — Streamlit re-renders the whole page and would fire this
+            # block again on every rerun if we didn't track whether we already saved.
+            # Think of it like: IF NOT EXISTS (SELECT 1 FROM saved WHERE msg_id = :i)
+            saved_key = f"fb_saved_{i}"
+            if feedback == 1 and not st.session_state.get(saved_key):
+                saved = save_vector_memory(
+                    question=msg["metadata"].get("standalone_query", msg.get("content", "")),
+                    sql=msg["metadata"].get("sql", ""),
+                    domain=msg["metadata"].get("domain", ""),
+                    feedback=1,
+                )
+                if saved:
+                    st.session_state[saved_key] = True
+                    # Rerun immediately so the sidebar counter reflects the new row
+                    st.rerun()
 
             # ✅ NEW: Save vector memory when user gives feedback
             if feedback is not None:  # feedback = 1 (thumbs up), 0 (thumbs down)
