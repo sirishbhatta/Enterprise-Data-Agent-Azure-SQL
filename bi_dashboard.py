@@ -609,4 +609,93 @@ for i, msg in enumerate(st.session_state.messages):
                     domain=msg["metadata"]["domain"],
                     feedback=feedback
                 )
+
+    if msg["role"] == "assistant":
+        st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
+
+# ── Main chat input ───────────────────────────────────────────────────────────
+user_input = st.chat_input("Ask about your data...")
+final_query = user_input if user_input else st.session_state.get("user_query")
+
+if final_query:
+    st.session_state.user_query = None
+
+    rewriter_history = [f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages[-4:]]
+    agent_history_list = []
+    for m in st.session_state.messages[-5:]:
+        msg_text = f"{m['role'].upper()}: {m['content']}"
+        if m["role"] == "assistant" and "metadata" in m and "sql" in m["metadata"]:
+            msg_text += f"\n[SYSTEM CONTEXT - Previous SQL Executed: {m['metadata']['sql']}]"
+        agent_history_list.append(msg_text)
+    agent_history_str = "\n".join(agent_history_list)
+
+    st.session_state.messages.append({"role": "user", "content": final_query})
+    with st.chat_message("user", avatar="👤"):
+        st.markdown(final_query.replace('$', '\\$'))
+        with st.spinner("Translating context..."):
+            standalone_query = rewrite_query(final_query, rewriter_history, selected_model)
+        if standalone_query.lower() != final_query.lower():
+            st.caption(f"*(Interpreted as: {standalone_query})*")
+
+    with st.chat_message("assistant", avatar="✨"):
+        start_time = time.time()
+        with st.spinner("Supervisor analyzing intent..."):
+            domain = supervisor_routing(standalone_query, agent_history_str, selected_model)
+            st.write(f"🔀 Supervisor routed to **{domain}**")
+
+        result = agent_execution(standalone_query, domain, agent_history_str, selected_model)
+
+        if result:
+            latency = round(time.time() - start_time, 2)
+            c1, c2, c3 = st.columns(3)
+            c1.metric("⏱️ Latency", f"{latency}s")
+            escalations = len(result.get("escalation_log", []))
+            confidence_label = "1st Try ✓" if escalations == 0 else f"After {escalations} retries"
+            c2.metric("🎯 Result", confidence_label)
+            c3.metric("🧠 Agent", result['agent'])
+
+            summary_prompt = f"Summarize these findings in 2-3 short bullet points. No markdown tables. Data: {result['df'].head(5).to_dict()}. Query: {standalone_query}"
+            summary = generate_ai_response(result['agent'], "Helpful BI Analyst", summary_prompt)
+            if '"error":' in summary:
+                summary = "Data retrieved successfully. See table below."
+
+            st.markdown(summary.replace('$', '\\$'))
+            st.dataframe(result['df'], width='stretch')
+
+            was_limited = result.get("was_limited", False)
+            max_r       = result.get("max_rows", MAX_ROWS)
+            if was_limited:
+                st.warning(
+                    f"⚠️ Results capped at **{max_r} rows**. "
+                    "Your query matched more data — add a WHERE clause or specify a filter to narrow it down.",
+                    icon="📊"
+                )
+
+            dl_filename = f"query_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            st.download_button(
+                label="📥 Download as Excel",
+                data=df_to_excel_bytes(result['df']),
+                file_name=dl_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": summary,
+                "data": result['df'],
+                "metadata": {
+                    "time":             latency,
+                    "agent":            result['agent'],
+                    "sql":              result['sql'],
+                    "reasoning":        result['reasoning'],
+                    "domain":           domain,
+                    "standalone_query": standalone_query,
+                    "escalation_log":   result.get("escalation_log", []),
+                    "was_limited":      was_limited,
+                    "max_rows":         max_r,
+                }
+            })
+            st.rerun()
+        else:
+            st.error("Escalation failed. All models failed to generate a working query.")
     
