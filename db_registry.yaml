@@ -5,6 +5,7 @@ databases:
     host: sirish-azure-sql-server.database.windows.net
     database: sirish_azure_sql_db
     username: sirishbhatta
+    password: "Baloo100!!a"
     password_env: AZURE_SQL_PASSWORD
     domain: AZURE_CLAIMS
     enabled: true

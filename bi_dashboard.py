@@ -357,16 +357,8 @@ with st.container(border=True):
         active_providers.append("Google")
         llm_details.append("- **Gemini Flash Series LLMs** (Cloud | Low Cost)")
 
-    if MINIMAX_API_KEY:
-        active_providers.append("Minimax")
-        llm_details.append("- **Minimax m2.7** (Cloud | Med Cost)")
-
     try:
-        # Check if ollama server is running. If it is, we list the local models from the dropdown.
-        ollama.list() # This will throw an exception if the server is not running.
-        active_providers.append("Ollama (Local)")
-        # This now matches the local models available in the primary model dropdown.
-        llm_details.append("- **Gemma, Qwen Coder, DeepSeek** (Local | Open Source | Free)")
+        pass # Ollama not running or installed
     except Exception:
         pass # Ollama not running or installed
 
@@ -399,8 +391,7 @@ with st.sidebar:
     
     selected_model = st.selectbox("Select primary model:", [
         "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5", "gemini-2.5-flash", 
-        "gemini-2.5-flash-lite", "gemini-3.1-flash-lite-preview", "minimax-m2.7:cloud", 
-        "gemma3:12b", "qwen2.5-coder:7b", "deepseek-r1:8b"
+        "gemini-2.5-flash-lite", "gemini-3.1-flash-lite-preview"
     ], format_func=format_model_label)
 
     st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">payments</span> Model Cost Hierarchy</div>', unsafe_allow_html=True)
@@ -410,32 +401,20 @@ with st.sidebar:
         <span style="font-size: 0.8rem;">• <b>Claude Opus 4.6</b> / <b>Claude Sonnet 4.6</b></span>
     </div>
     <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 1.5: Ollama Cloud (Previews)</b><br>
-        <span style="font-size: 0.8rem;">• <b>Minimax (m2.7)</b></span>
-    </div>
-    <div style="margin-top: 12px;">
         <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 2: Fast & Efficient</b><br>
         <span style="font-size: 0.8rem;">• <b>Claude Haiku 4.5</b> / <b>Gemini 2.5 Flash</b></span>
-    </div>
-    <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #16a34a;">dns</span> Tier 3: Local Specialists</b><br>
-        <span style="font-size: 0.8rem;">• <b>Qwen Coder</b> / <b>DeepSeek-R1</b> / <b>Gemma 3</b></span>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">science</span> Actionable Test Suite</div>', unsafe_allow_html=True)
     
-    # NEW SPECIFIC TEST QUESTIONS for the updated hr_employees schema
-    if st.button(":material/bar_chart: HR: Average Salary", use_container_width=True): 
-        st.session_state.user_query = "What is the average salary by department?"
-    if st.button(":material/calendar_month: HR: Recent Hires", use_container_width=True): 
-        st.session_state.user_query = "Which employees were hired after January 1, 2024?"
+    # Azure SQL (Claims) TEST QUESTIONS
     if st.button(":material/cancel: Claims: Total Denied", use_container_width=True): 
         st.session_state.user_query = "What is the total billed amount for claims that were Denied?"
     if st.button(":material/health_and_safety: Claims: Top Provider", use_container_width=True): 
         st.session_state.user_query = "Which ProviderName has the highest number of approved claims?"
-    if st.button(":material/hub: Federated: High Earners Claims", use_container_width=True): 
-        st.session_state.user_query = "Show me the names and total billed claims of employees in the Marketing department."
+    if st.button(":material/analytics: Provider Summary", use_container_width=True):
+        st.session_state.user_query = "Show me the provider with the highest TotalBilled amount from the ProviderClaimSummary table."
 
 # Chat Rendering
 for i, msg in enumerate(st.session_state.messages):
