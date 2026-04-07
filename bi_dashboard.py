@@ -117,11 +117,13 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
     question_embedding VECTOR(768, float32) column is populated for future
     semantic search / memory retrieval.
 
-    Think of it like this in SQL terms:
-        INSERT INTO ai_query_cache (user_question, sql_code, question_embedding, created_at)
-        VALUES (:q, :s, CAST(:json_array AS VECTOR(768)), GETDATE())
-
-    The JSON array '[0.12, -0.34, ...]' is how Azure SQL accepts VECTOR literals.
+    Azure SQL VECTOR insertion note:
+        CAST(:vec AS VECTOR(768)) does NOT work with pyodbc parameterized queries
+        because pyodbc can't bind a string parameter into a CAST for custom types.
+        Instead, we pass the JSON array string directly — Azure SQL implicitly
+        converts it to VECTOR(768, float32) based on the column type.
+        SQL analogy: same as INSERT INTO t (dt_col) VALUES (:str) where dt_col is
+        DATETIME — SQL Server handles the implicit conversion from the string.
     """
     engine = _get_memory_engine()
     if not engine:
@@ -129,8 +131,8 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
 
     # --- Generate embedding via Gemini text-embedding-004 ---
     # text-embedding-004 outputs exactly 768 floats — matches VECTOR(768, float32).
-    # This is the cloud equivalent of nomic-embed-text (which your local app uses via Ollama).
-    # We already have GOOGLE_API_KEY in Azure, so no extra credential needed.
+    # This is the cloud equivalent of nomic-embed-text (local Ollama model).
+    # GOOGLE_API_KEY is already set in Azure — no extra credential needed.
     embedding_json = None
     if gemini_client:
         try:
@@ -140,16 +142,17 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
             )
             embedding_vector = emb_response.embeddings[0].values  # list of 768 floats
             embedding_json = json.dumps(embedding_vector)
-        except Exception:
-            pass  # embedding is optional — still save text memory if embedding fails
+        except Exception as embed_err:
+            # Show a toast so the error is visible instead of silent
+            st.toast(f"⚠️ Embedding failed: {embed_err}", icon="⚠️")
 
     try:
         with engine.begin() as conn:
             if embedding_json:
-                # Azure SQL accepts VECTOR literals as JSON arrays via CAST
+                # Pass the JSON string directly — Azure SQL implicitly converts to VECTOR
                 conn.execute(_sql_text("""
                     INSERT INTO ai_query_cache (user_question, sql_code, question_embedding, created_at)
-                    VALUES (:q, :s, CAST(:vec AS VECTOR(768)), GETDATE())
+                    VALUES (:q, :s, :vec, GETDATE())
                 """), {"q": question[:500], "s": sql, "vec": embedding_json})
             else:
                 # Fallback: save without embedding if Gemini call failed
@@ -158,7 +161,8 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
                     VALUES (:q, :s, GETDATE())
                 """), {"q": question[:500], "s": sql})
         return True
-    except Exception:
+    except Exception as save_err:
+        st.toast(f"⚠️ Memory save failed: {save_err}", icon="⚠️")
         return False
 
 def get_memory_count() -> int:
