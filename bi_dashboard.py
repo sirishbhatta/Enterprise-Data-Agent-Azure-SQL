@@ -117,16 +117,10 @@ st.markdown("""
 # Falls back to hardcoded strings if the cache hasn't been populated yet.
 _dynamic_schema = dbc.get_schema_for_llm()
 _SCHEMA_FALLBACK = (
-    "[AZURE_CLAIMS | Azure SQL Claims | MSSQL]
-"
+    "[AZURE_CLAIMS | Azure SQL Claims | MSSQL]\n"
     "  Table Claims: ClaimID* (INTEGER), MemberID (VARCHAR), ServiceDate (DATE), ProviderName (VARCHAR), "
-    "DiagnosisCode (VARCHAR), ProcedureCode (VARCHAR), BilledAmount (DECIMAL), PaidAmount (DECIMAL), ClaimStatus (VARCHAR)
-"
+    "DiagnosisCode (VARCHAR), ProcedureCode (VARCHAR), BilledAmount (DECIMAL), PaidAmount (DECIMAL), ClaimStatus (VARCHAR)\n"
     "  Table ProviderClaimSummary: ProviderName (VARCHAR), TotalBilled (DECIMAL), TotalPaid (DECIMAL), DeniedClaims (INT)"
-), name (VARCHAR), department (VARCHAR), salary (DECIMAL), hire_date (DATE)\n\n"
-    "[CLAIMS | Healthcare Claims | MSSQL]\n"
-    "  Table Claims: ClaimID* (INTEGER), MemberID (VARCHAR), ServiceDate (DATE), ProviderName (VARCHAR), "
-    "DiagnosisCode (VARCHAR), ProcedureCode (VARCHAR), BilledAmount (DECIMAL), PaidAmount (DECIMAL), ClaimStatus (VARCHAR)"
 )
 ACTIVE_SCHEMA = _dynamic_schema if "Table" in _dynamic_schema else _SCHEMA_FALLBACK
 
@@ -271,8 +265,7 @@ def agent_execution(user_question, domain, history_str, model):
     for current_model in models_to_try:
         with st.status(f"✨ Agent: {current_model}...", expanded=False) as status:
             try:
-                raw_res = generate_ai_response(current_model, system_prompt, f"History: {history_str}
-Question: {user_question}")
+                raw_res = generate_ai_response(current_model, system_prompt, f"History: {history_str}\nQuestion: {user_question}")
                 if '"error":' in raw_res: 
                     status.update(label=f"⚠️ {current_model} API Error", state="error")
                     escalation_log.append({"model": current_model, "error": f"API Error: {raw_res}"})
