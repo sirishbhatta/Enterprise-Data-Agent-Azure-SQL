@@ -151,7 +151,7 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
     if gemini_client:
         try:
             emb_response = gemini_client.models.embed_content(
-                model="text-embedding-004",
+                model="embedding-001",   # text-embedding-004 is v1 only; embedding-001 works on v1beta (SDK default)
                 contents=question[:500],
             )
             # Try batch shape first, then singular shape
