@@ -61,6 +61,7 @@ project_root = Path(__file__).resolve().parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 import db_connector as dbc
+from vector_memory import save_vector_memory, check_vector_memory, get_vector_memory_stats
 
 # --- 0. SUPPRESS WARNINGS ---
 # SQLAlchemy warns when pandas uses it in a certain way — we know it's fine, so silence it.
@@ -381,6 +382,12 @@ with st.sidebar:
     if GEMINI_API_KEY:
         st.markdown('<div class="api-info"><span class="material-symbols-rounded mat-icon">cloud_done</span><b>Cloud Inference Active</b></div>', unsafe_allow_html=True)
 
+    # ✅ NEW: Show vector memory stats
+    try:
+        stats = get_vector_memory_stats(SQL_SERVER_NAME, SQL_USER, SQL_PASSWORD)
+        st.metric("📚 Cached Answers", stats["total_cached_questions"])
+    except:
+        pass  # If vector table doesn't exist yet, just skip
 
     if st.button(":material/delete: Clear History", use_container_width=True):
         st.session_state.messages = []
@@ -460,6 +467,21 @@ for i, msg in enumerate(st.session_state.messages):
             feedback_key = f"fb_{i}"
             feedback = st.feedback("thumbs", key=feedback_key)
 
+            # ✅ NEW: Save vector memory when user gives feedback
+            if feedback is not None:  # feedback = 1 (thumbs up), 0 (thumbs down)
+                is_positive = (feedback == 1)
+                save_vector_memory(
+                    gemini_client=gemini_client,
+                    sql_server=SQL_SERVER_NAME,
+                    sql_user=SQL_USER,
+                    sql_password=SQL_PASSWORD,
+                    user_question=msg["metadata"]["standalone_query"],
+                    sql_code=msg["metadata"]["sql"],
+                    domain=msg["metadata"]["domain"],
+                    agent_model=msg["metadata"]["agent"],
+                    is_positive=is_positive
+                )
+
     if msg["role"] == "assistant":
         st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
 
@@ -469,7 +491,21 @@ final_query = user_input if user_input else st.session_state.get("user_query")
 
 if final_query:
     st.session_state.user_query = None
-    
+
+    # ✅ NEW: Check if we've seen a similar question before
+    if gemini_client:
+        cached_sql, similarity_score = check_vector_memory(
+            gemini_client=gemini_client,
+            sql_server=SQL_SERVER_NAME,
+            sql_user=SQL_USER,
+            sql_password=SQL_PASSWORD,
+            user_question=final_query,
+            threshold=65.0
+        )
+        if cached_sql:
+            st.info(f"💡 **Cached Answer Found!** ({similarity_score:.1f}% similar)\n\n"
+                   f"We've seen a very similar question before. Using that as a hint...")
+
     rewriter_history = [f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages[-4:]]
 
     agent_history_list = []
