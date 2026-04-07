@@ -61,7 +61,6 @@ project_root = Path(__file__).resolve().parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 import db_connector as dbc
-from vector_memory import save_vector_memory, check_vector_memory, get_vector_memory_stats
 
 # --- 0. SUPPRESS WARNINGS ---
 # SQLAlchemy warns when pandas uses it in a certain way — we know it's fine, so silence it.
@@ -601,148 +600,13 @@ for i, msg in enumerate(st.session_state.messages):
         if msg["role"] == "assistant" and "metadata" in msg:
             feedback_key = f"fb_{i}"
             feedback = st.feedback("thumbs", key=feedback_key)
-            # feedback == 1 means thumbs up.
-            # We use a session_state guard (fb_saved_{i}) to ensure we only save once
-            # per message — Streamlit re-renders the whole page and would fire this
-            # block again on every rerun if we didn't track whether we already saved.
-            # Think of it like: IF NOT EXISTS (SELECT 1 FROM saved WHERE msg_id = :i)
-            saved_key = f"fb_saved_{i}"
-            if feedback == 1 and not st.session_state.get(saved_key):
-                saved = save_vector_memory(
-                    question=msg["metadata"].get("standalone_query", msg.get("content", "")),
-                    sql=msg["metadata"].get("sql", ""),
-                    domain=msg["metadata"].get("domain", ""),
-                    feedback=1,
-                )
-                if saved:
-                    st.session_state[saved_key] = True
-                    # Rerun immediately so the sidebar counter reflects the new row
-                    st.rerun()
 
-            # ✅ NEW: Save vector memory when user gives feedback
-            if feedback is not None:  # feedback = 1 (thumbs up), 0 (thumbs down)
-                is_positive = (feedback == 1)
+            # Save to vector memory on thumbs up/down
+            if feedback is not None:
                 save_vector_memory(
-                    gemini_client=gemini_client,
-                    sql_server=SQL_SERVER_NAME,
-                    sql_user=SQL_USER,
-                    sql_password=SQL_PASSWORD,
-                    user_question=msg["metadata"]["standalone_query"],
-                    sql_code=msg["metadata"]["sql"],
+                    question=msg["metadata"]["standalone_query"],
+                    sql=msg["metadata"]["sql"],
                     domain=msg["metadata"]["domain"],
-                    agent_model=msg["metadata"]["agent"],
-                    is_positive=is_positive
+                    feedback=feedback
                 )
-
-    if msg["role"] == "assistant":
-        st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
-
-# Main Input
-user_input = st.chat_input("Ask about your data...")
-final_query = user_input if user_input else st.session_state.get("user_query")
-
-if final_query:
-    st.session_state.user_query = None
-
-    # ✅ NEW: Check if we've seen a similar question before
-    if gemini_client:
-        cached_sql, similarity_score = check_vector_memory(
-            gemini_client=gemini_client,
-            sql_server=SQL_SERVER_NAME,
-            sql_user=SQL_USER,
-            sql_password=SQL_PASSWORD,
-            user_question=final_query,
-            threshold=65.0
-        )
-        if cached_sql:
-            st.info(f"💡 **Cached Answer Found!** ({similarity_score:.1f}% similar)\n\n"
-                   f"We've seen a very similar question before. Using that as a hint...")
-
-    rewriter_history = [f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages[-4:]]
-
-    agent_history_list = []
-    for m in st.session_state.messages[-5:]:
-        msg_text = f"{m['role'].upper()}: {m['content']}"
-        if m["role"] == "assistant" and "metadata" in m and "sql" in m["metadata"]:
-            msg_text += f"\n[SYSTEM CONTEXT - Previous SQL Executed: {m['metadata']['sql']}]"
-        agent_history_list.append(msg_text)
-    agent_history_str = "\n".join(agent_history_list)
-
-    st.session_state.messages.append({"role": "user", "content": final_query})
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(final_query.replace('$', '\\$'))
-        
-        with st.spinner("Translating context..."):
-            standalone_query = rewrite_query(final_query, rewriter_history, selected_model)
-            
-        if standalone_query.lower() != final_query.lower():            st.caption(f"*(Interpreted as: {standalone_query})*")
-
-    with st.chat_message("assistant", avatar="✨"):
-        start_time = time.time()
-        
-        with st.spinner("Supervisor analyzing intent..."):
-            domain = supervisor_routing(standalone_query, agent_history_str, selected_model)
-            st.write(f"🔀 Supervisor routed to **{domain}**")
-            
-        result = agent_execution(standalone_query, domain, agent_history_str, selected_model)
-        
-        if result:
-            latency = round(time.time() - start_time, 2)
-
-            c1, c2, c3 = st.columns(3)
-            c1.metric("⏱️ Latency", f"{latency}s")
-            escalations = len(result.get("escalation_log", []))
-            confidence_label = "1st Try ✓" if escalations == 0 else f"After {escalations} retries"
-            c2.metric("🎯 Result", confidence_label)
-            c3.metric("🧠 Agent", result['agent'])
-            
-            summary_prompt = f"Summarize these findings in 2-3 short bullet points. No markdown tables. Data: {result['df'].head(5).to_dict()}. Query: {standalone_query}"
-            summary = generate_ai_response(result['agent'], "Helpful BI Analyst", summary_prompt)
-            if '"error":' in summary:
-                summary = "Data retrieved successfully. See table below."
-                
-            st.markdown(summary.replace('$', '\\$'))
-            st.dataframe(result['df'], width='stretch')
-
-            # ── Row-cap notice ──────────────────────────────────────────────
-            # was_limited=True means the row limit was injected into the SQL.
-            # We warn the user so they know they might not be seeing all data.
-            was_limited = result.get("was_limited", False)
-            max_r       = result.get("max_rows", MAX_ROWS)
-            if was_limited:
-                st.warning(
-                    f"⚠️ Results capped at **{max_r} rows**. "
-                    "Your query matched more data — add a WHERE clause or specify a filter to narrow it down.",
-                    icon="📊"
-                )
-
-            # ── Excel download button ───────────────────────────────────────
-            # df_to_excel_bytes() converts the DataFrame to an in-memory Excel file.
-            # st.download_button serves it as a file download — no temp file on disk.
-            dl_filename = f"query_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            st.download_button(
-                label="📥 Download as Excel",
-                data=df_to_excel_bytes(result['df']),
-                file_name=dl_filename,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": summary,
-                "data": result['df'],
-                "metadata": {
-                    "time":             latency,
-                    "agent":            result['agent'],
-                    "sql":              result['sql'],
-                    "reasoning":        result['reasoning'],
-                    "domain":           domain,
-                    "standalone_query": standalone_query,
-                    "escalation_log":   result.get("escalation_log", []),
-                    "was_limited":      was_limited,      # persist for chat history redisplay
-                    "max_rows":         max_r,
-                }
-            })
-            st.rerun()
-        else:
-            st.error("Escalation failed. All models failed to generate a working query.")
+    
