@@ -90,6 +90,13 @@ if "user_query" not in st.session_state:
 
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+# Embedding models (text-embedding-004, embedding-001) only exist in the v1 API.
+# The default SDK client uses v1beta, which returns 404 for embedContent.
+# We create a separate client locked to v1 just for embedding calls.
+gemini_embed_client = (
+    genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
+    if GEMINI_API_KEY else None
+)
 
 # --- 2. VECTOR MEMORY (Azure SQL) ---
 # Memory stores question+SQL pairs so the app learns from past queries.
@@ -148,10 +155,10 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
     # Both ContentEmbedding objects have a .values field = list[float].
     # We check both so we don't crash if the shape changes between SDK versions.
     embedding_json = None
-    if gemini_client:
+    if gemini_embed_client:
         try:
-            emb_response = gemini_client.models.embed_content(
-                model="embedding-001",   # text-embedding-004 is v1 only; embedding-001 works on v1beta (SDK default)
+            emb_response = gemini_embed_client.models.embed_content(
+                model="text-embedding-004",  # v1 client — this model exists here
                 contents=question[:500],
             )
             # Try batch shape first, then singular shape
