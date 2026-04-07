@@ -41,12 +41,9 @@
 
 import streamlit as st
 import pandas as pd
-import psycopg2   # PostgreSQL driver — used ONLY for the vector memory functions below
-import pyodbc     # SQL Server driver — used ONLY for the vector memory functions below
 import os
 import time
 import json
-import ollama     # Python client for your local Ollama server (runs on your GPU)
 import re         # Regular expressions — used to extract JSON from AI responses
 import sqlparse   # Pretty-prints SQL queries in the UI (adds indentation, uppercase keywords)
 import warnings
@@ -84,94 +81,6 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY")
 MINIMAX_API_KEY   = os.getenv("MINIMAX_API_KEY")
 
-def get_sql_connection():
-    """Helper to get a SQL Server connection for the Vector Engine."""
-    drivers = pyodbc.drivers()
-    sql_drivers = [d for d in drivers if 'SQL Server' in d]
-    odbc_drivers = [d for d in sql_drivers if 'ODBC Driver' in d]
-    driver_name = odbc_drivers[-1] if odbc_drivers else (sql_drivers[-1] if sql_drivers else 'SQL Server')
-    
-    conn_str = f"DRIVER={{{driver_name}}};SERVER={SQL_SERVER_NAME};DATABASE=HealthcareClaims;UID={SQL_USER};PWD={SQL_PASSWORD};Timeout=15;"
-    if driver_name != 'SQL Server':
-        conn_str += "TrustServerCertificate=yes;"
-    return pyodbc.connect(conn_str)
-
-def get_vector_memory_count():
-    """Counts how many memories are stored in the SQL Server vector table."""
-    try:
-        conn = get_sql_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM ai_query_cache;")
-        count = cursor.fetchone()[0]
-        conn.close()
-        return count
-    except Exception as e:
-        print(f"Memory Count Error: {e}")
-        return 0
-
-def save_vector_memory(query, sql, domain, agent, is_positive):
-    """Saves user feedback to the SQL Server Vector Memory Bank.
-    Skips saving if a near-duplicate (>=95% similarity) already exists.
-    """
-    if not is_positive:
-        return
-
-    try:
-        # Deduplication check — skip if we already have a very similar entry
-        existing, score = check_vector_memory(query, threshold=95.0)
-        if existing:
-            print(f"[Vector Memory] Skipping duplicate — {score:.1f}% match already cached.")
-            return
-
-        vector_data = ollama.embeddings(model="nomic-embed-text", prompt=query)["embedding"]
-        vector_string = json.dumps(vector_data)
-
-        conn = get_sql_connection()
-        cursor = conn.cursor()
-        insert_query = """
-            INSERT INTO ai_query_cache (user_question, sql_code, question_embedding)
-            VALUES (?, ?, CAST(CAST(? AS NVARCHAR(MAX)) AS VECTOR(768)))
-        """
-        cursor.execute(insert_query, query, sql, vector_string)
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Failed to save vector memory: {e}")
-
-def check_vector_memory(user_question, threshold=65.0):
-    """Searches SQL Server 2025 using VECTOR_DISTANCE for a semantic match."""
-    try:
-        vector_data = ollama.embeddings(model="nomic-embed-text", prompt=user_question)["embedding"]
-        vector_string = json.dumps(vector_data)
-
-        conn = get_sql_connection()
-        cursor = conn.cursor()
-        search_query = """
-            SELECT TOP 1 
-                user_question, 
-                sql_code,
-                VECTOR_DISTANCE('cosine', question_embedding, CAST(CAST(? AS NVARCHAR(MAX)) AS VECTOR(768))) AS distance_score
-            FROM ai_query_cache
-            ORDER BY distance_score ASC;
-        """
-        cursor.execute(search_query, vector_string)
-        result = cursor.fetchone()
-        conn.close()
-
-        if result:
-            cached_question = result[0]
-            cached_sql = result[1]
-            sql_distance = result[2]
-            similarity_score = (1 - sql_distance) * 100
-            
-            if similarity_score >= threshold:
-                return {"query": cached_question, "sql": cached_sql}, similarity_score
-                
-    except Exception as e:
-        print(f"Vector Search Error: {e}")
-        
-    return None, 0.0
-
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -208,8 +117,13 @@ st.markdown("""
 # Falls back to hardcoded strings if the cache hasn't been populated yet.
 _dynamic_schema = dbc.get_schema_for_llm()
 _SCHEMA_FALLBACK = (
-    "[HR | HR Analytics | POSTGRESQL]\n"
-    "  Table hr_employees: emp_id* (INTEGER), name (VARCHAR), department (VARCHAR), salary (DECIMAL), hire_date (DATE)\n\n"
+    "[AZURE_CLAIMS | Azure SQL Claims | MSSQL]
+"
+    "  Table Claims: ClaimID* (INTEGER), MemberID (VARCHAR), ServiceDate (DATE), ProviderName (VARCHAR), "
+    "DiagnosisCode (VARCHAR), ProcedureCode (VARCHAR), BilledAmount (DECIMAL), PaidAmount (DECIMAL), ClaimStatus (VARCHAR)
+"
+    "  Table ProviderClaimSummary: ProviderName (VARCHAR), TotalBilled (DECIMAL), TotalPaid (DECIMAL), DeniedClaims (INT)"
+), name (VARCHAR), department (VARCHAR), salary (DECIMAL), hire_date (DATE)\n\n"
     "[CLAIMS | Healthcare Claims | MSSQL]\n"
     "  Table Claims: ClaimID* (INTEGER), MemberID (VARCHAR), ServiceDate (DATE), ProviderName (VARCHAR), "
     "DiagnosisCode (VARCHAR), ProcedureCode (VARCHAR), BilledAmount (DECIMAL), PaidAmount (DECIMAL), ClaimStatus (VARCHAR)"
@@ -225,39 +139,6 @@ ACTIVE_DOMAINS = list(DOMAIN_MAP.keys())   # e.g. ["HR", "CLAIMS"]
 # Prevents "SELECT * FROM Claims" from returning 500k rows and crashing things.
 # Change this number if you need more rows for a specific use case.
 MAX_ROWS = 500
-
-# ── FEDERATED join configurations ────────────────────────────────────────────
-# When the AI routes to FEDERATED, two databases are queried separately and
-# then joined in Python using pandas.merge(). This dict defines the join keys
-# for every known pair of databases.
-#
-# How to add a new pair: add an entry with frozenset(["DOMAIN_A", "DOMAIN_B"])
-# as the key and specify which columns to join on (left_key / right_key).
-# Both key values will be cast to string before merging to avoid type mismatches.
-FEDERATED_JOIN_CONFIGS = {
-    frozenset(["HR", "CLAIMS"]): {
-        "left":      "HR",
-        "right":     "CLAIMS",
-        "left_key":  "emp_id",
-        "right_key": "memberid",
-        "hint": (
-            "JOIN KEY: hr_employees.emp_id (INT) = Claims.MemberID (VARCHAR). "
-            "Cast both to string in the merge step. MemberID MUST be quoted in SQL."
-        ),
-    },
-    frozenset(["HR", "AZURE_CLAIMS"]): {
-        # Azure SQL has the same Claims table structure as the local SQL Server Claims DB.
-        # The join key is identical — emp_id (HR) maps to MemberID (Azure Claims).
-        "left":      "HR",
-        "right":     "AZURE_CLAIMS",
-        "left_key":  "emp_id",
-        "right_key": "memberid",
-        "hint": (
-            "JOIN KEY: hr_employees.emp_id (INT) = Azure Claims.MemberID (VARCHAR). "
-            "Cast both to string in the merge step. MemberID MUST be quoted in SQL."
-        ),
-    },
-}
 
 # --- 4. UNIFIED AI ROUTER ---
 # This single function handles ALL AI providers: Gemini, Claude, and Ollama.
@@ -288,10 +169,7 @@ def generate_ai_response(model_name, system_prompt, user_prompt):
         except Exception as e: return f'{{"error": "Claude Error: {str(e)}"}}'
             
     else:
-        try:
-            res = ollama.generate(model=model_name, system=system_prompt, prompt=user_prompt)
-            return res['response']
-        except Exception as e: return f'{{"error": "Ollama Error: {str(e)}"}}'
+        return f'{"error": "Model {model_name} is not supported in this cloud deployment"}'
 
 # --- 5. DATABASE ENGINE ---
 # Uses db_connector.execute_query which reads db_registry.yaml — no hardcoded connections.
@@ -350,8 +228,6 @@ def rewrite_query(current_question, history_list, model):
     return rewritten.strip('"').strip()
 
 def supervisor_routing(user_question, history_str, model):
-    memory, _ = check_vector_memory(user_question)
-    memory_hint = f"\n\n[HINT]: A past similar question ('{memory['query']}') was routed correctly." if memory else ""
 
     # Build domain routing rules dynamically from the registry
     domain_rules = "\n".join(
@@ -364,7 +240,7 @@ def supervisor_routing(user_question, history_str, model):
     Routing rules:
 {domain_rules}
     - FEDERATED: ONLY if the question explicitly requires joining data from TWO OR MORE of the above databases.
-    {memory_hint}"""
+"""
 
     raw = generate_ai_response(model, system, f"History: {history_str}\nQuestion: {user_question}")
 
@@ -382,57 +258,21 @@ def supervisor_routing(user_question, history_str, model):
     return ACTIVE_DOMAINS[0] if ACTIVE_DOMAINS else "HR"
 
 def agent_execution(user_question, domain, history_str, model):
-    """
-    The core worker: asks an AI to write SQL, runs it on the database, returns results.
-
-    "Cascade" pattern: if the first AI fails (API error, bad SQL), automatically
-    tries the next model in the list. This makes the app resilient — it won't give
-    up just because one provider is down or returns garbage SQL.
-    """
-    # Use dynamically discovered schema — refreshed via Connection Manager
     context = ACTIVE_SCHEMA
+    format_req = '{ "explanation": "...", "sql_query": "..." }'
 
-    if domain == "FEDERATED":
-        # Look up the join hint for whichever pair of active domains is configured.
-        # This replaces the old hardcoded "HR+CLAIMS only" check and now supports
-        # HR+AZURE_CLAIMS (and any future pair added to FEDERATED_JOIN_CONFIGS).
-        active_set = set(ACTIVE_DOMAINS)
-        for pair, cfg in FEDERATED_JOIN_CONFIGS.items():
-            if pair.issubset(active_set):
-                context += f"\n{cfg['hint']}"
-                break   # Use the first matching pair — usually only one applies
-
-        # Build a dynamic format string that names query keys by their domain.
-        # e.g. { "explanation": "...", "HR_query": "SELECT ...", "CLAIMS_query": "SELECT ..." }
-        # Using domain names (not "postgres_query") means the AI knows exactly
-        # which query goes to which database without us hardcoding it.
-        fed_fields = ", ".join(f'"{d}_query": "SELECT ..."' for d in ACTIVE_DOMAINS)
-        format_req = '{ "explanation": "...", ' + fed_fields + ' }'
-    else:
-        format_req = '{ "explanation": "...", "sql_query": "..." }'
-
-    memory, match_ratio = check_vector_memory(user_question)
-    memory_hint = f"\n[CRITICAL OVERRIDE]: Found {match_ratio:.1f}% semantic match! Past Question: '{memory['query']}'\nPast SQL:\n{memory['sql']}\nBorrow this syntax heavily!" if memory else ""
-
-    # UPDATED: Relaxed the Join Key rule so it doesn't break aggregate GROUP BY queries
     system_prompt = f"""Senior Data Architect. Context: {context}
-    1. Join key is emp_id (INT) and MemberID (VARCHAR). MemberID MUST be in quotes.
-    2. FEDERATED requires BOTH queries. NO CROSS-DATABASE JOINS.
-    3. FOR FEDERATED QUERIES ONLY: Include join keys in SELECT clauses. Do NOT force join keys into standard HR or CLAIMS aggregate queries!
-    4. Flat strings for SQL.{memory_hint}
     Return JSON ONLY: {format_req}"""
     
-    # The cascade list: try models in order. dict.fromkeys() removes duplicates
-    # while preserving order, so if the user already selected "claude-sonnet-4-6"
-    # it won't appear twice in the list.
-    cascade = [model, "gemini-2.5-flash", "gemini-3.1-flash-lite-preview", "claude-sonnet-4-6", "qwen2.5-coder:7b", "deepseek-r1:8b", "gemma3:12b"]
+    cascade = [model, "gemini-2.5-flash", "claude-sonnet-4-6"]
     models_to_try = list(dict.fromkeys(cascade))
-    escalation_log = []   # Track which models were tried and why they failed
+    escalation_log = []
 
     for current_model in models_to_try:
         with st.status(f"✨ Agent: {current_model}...", expanded=False) as status:
             try:
-                raw_res = generate_ai_response(current_model, system_prompt, f"History: {history_str}\nQuestion: {user_question}")
+                raw_res = generate_ai_response(current_model, system_prompt, f"History: {history_str}
+Question: {user_question}")
                 if '"error":' in raw_res: 
                     status.update(label=f"⚠️ {current_model} API Error", state="error")
                     escalation_log.append({"model": current_model, "error": f"API Error: {raw_res}"})
@@ -441,119 +281,27 @@ def agent_execution(user_question, domain, history_str, model):
                 match = re.search(r'\{.*\}', re.sub(r'<think>.*?</think>', '', raw_res, flags=re.DOTALL), re.DOTALL)
                 if match:
                     plan = json.loads(match.group(0))
-                    
-                    if domain == "FEDERATED":
-                        # ── Step 1: Collect all domain queries from the AI's response ──
-                        # The AI returns keys like "HR_query", "CLAIMS_query", etc.
-                        # We also check old keys ("postgres_query", "sql_server_query")
-                        # for backward compatibility with cached vector memory hints.
-                        domain_queries = {}
-                        for k, v in plan.items():
-                            if k.endswith("_query") and v and str(v).strip():
-                                dom = k.replace("_query", "").upper()
-                                domain_queries[dom] = str(v)
-
-                        # Backward-compat: old format used postgres_query / sql_server_query
-                        _compat = {"POSTGRES": "HR", "SQL_SERVER": "CLAIMS"}
-                        for old, new_dom in _compat.items():
-                            if old + "_QUERY" in {k.upper() for k in plan} and new_dom not in domain_queries:
-                                fallback = plan.get(f"{old.lower()}_query", "")
-                                if fallback:
-                                    domain_queries[new_dom] = str(fallback)
-
-                        # ── Step 2: Run each domain query against its database ──
-                        domain_results = {}
-                        err_msgs       = []
-                        for dom, sql_q in domain_queries.items():
-                            res = get_db_data(sql_q, dom)
-                            domain_results[dom] = res
-                            if not res["success"]:
-                                err_msgs.append(f"{dom}: {res.get('error', 'unknown error')}")
-
-                        all_ok = not err_msgs and len(domain_results) >= 2
-
-                        if all_ok:
-                            # ── Step 3: Merge using the configured join keys ──
-                            active_pair = frozenset(domain_results.keys())
-                            join_cfg    = FEDERATED_JOIN_CONFIGS.get(active_pair)
-
-                            if join_cfg:
-                                # Known pair — use configured join keys
-                                df_left  = domain_results[join_cfg["left"]]["data"].copy()
-                                df_right = domain_results[join_cfg["right"]]["data"].copy()
-                                df_left.columns  = [c.lower() for c in df_left.columns]
-                                df_right.columns = [c.lower() for c in df_right.columns]
-                                df_left[join_cfg["left_key"]]   = df_left[join_cfg["left_key"]].astype(str).str.strip()
-                                df_right[join_cfg["right_key"]] = df_right[join_cfg["right_key"]].astype(str).str.strip()
-                                final_df = pd.merge(df_left, df_right,
-                                                    left_on=join_cfg["left_key"],
-                                                    right_on=join_cfg["right_key"],
-                                                    how="inner")
-                            else:
-                                # Unknown pair — try merging on the first common column name
-                                dfs = [r["data"].copy() for r in domain_results.values()]
-                                for d in dfs:
-                                    d.columns = [c.lower() for c in d.columns]
-                                common = list(set(dfs[0].columns) & set(dfs[1].columns))
-                                if common:
-                                    final_df = pd.merge(dfs[0], dfs[1], on=common[0], how="inner")
-                                else:
-                                    # No common column — return both tables side-by-side
-                                    final_df = pd.concat(dfs, axis=1)
-
-                            was_limited = any(r.get("was_limited", False) for r in domain_results.values())
-                            fed_sql_display = (
-                                "-- FEDERATED QUERY EXECUTED\n"
-                                + "\n\n".join(f"-- {dom}:\n{sql_q}" for dom, sql_q in domain_queries.items())
-                            )
-                            return {
-                                "df":            final_df,
-                                "sql":           fed_sql_display,
-                                "agent":         current_model,
-                                "reasoning":     plan.get("explanation", "N/A"),
-                                "escalation_log": escalation_log,
-                                "memory_used":   bool(memory),
-                                "memory_ratio":  match_ratio,
-                                "was_limited":   was_limited,
-                            }
-                        else:
-                            err_msg = " | ".join(err_msgs) if err_msgs else "AI returned no valid domain queries"
-                            status.update(label=f"⚠️ {current_model} FEDERATED Error", state="error")
-                            st.toast(f"{current_model} Failed: {err_msg}", icon="❌")
-                            escalation_log.append({"model": current_model, "error": err_msg})
-                            continue
-
+                    target_sql = str(plan.get("sql_query", ""))
+                    res_db = get_db_data(target_sql, domain)
+                    if res_db["success"]:
+                        return {
+                            "df":            res_db["data"],
+                            "sql":           target_sql,
+                            "agent":         current_model,
+                            "reasoning":     plan.get("explanation", "N/A"),
+                            "escalation_log": escalation_log,
+                            "was_limited":   res_db.get("was_limited", False),
+                            "max_rows":      res_db.get("max_rows", MAX_ROWS),
+                        }
                     else:
-                        # ── Single-database query path ──
-                        # Try all possible key names the AI might use for the SQL
-                        target_sql = str(
-                            plan.get("sql_query") or
-                            plan.get("postgres_query") or
-                            plan.get("sql_server_query") or ""
-                        )
-                        res_db = get_db_data(target_sql, domain)
-                        if res_db["success"]:
-                            return {
-                                "df":            res_db["data"],
-                                "sql":           target_sql,
-                                "agent":         current_model,
-                                "reasoning":     plan.get("explanation", "N/A"),
-                                "escalation_log": escalation_log,
-                                "memory_used":   bool(memory),
-                                "memory_ratio":  match_ratio,
-                                "was_limited":   res_db.get("was_limited", False),
-                                "max_rows":      res_db.get("max_rows", MAX_ROWS),
-                            }
-                        else:
-                            status.update(label=f"⚠️ {current_model} DB Error", state="error")
-                            st.toast(f"{current_model} Failed: {res_db['error']}", icon="❌")
-                            escalation_log.append({"model": current_model, "error": f"DB Error: {res_db['error']}"})
-                            continue
+                        status.update(label=f"⚠️ {current_model} DB Error", state="error")
+                        st.toast(f"{current_model} Failed: {res_db['error']}", icon="❌")
+                        escalation_log.append({"model": current_model, "error": f"DB Error: {res_db['error']}"})
+                        continue
             except Exception as e:
                 status.update(label=f"⚠️ {current_model} Execution Error", state="error")
                 escalation_log.append({"model": current_model, "error": f"Execution Error: {str(e)}"})
     return None
-
 def format_model_label(model_name):
     if "opus" in model_name or "sonnet" in model_name: return f"✨ {model_name} (Cloud Pro)"
     elif "haiku" in model_name or "gemini" in model_name: return f"⚡ {model_name} (Cloud)"
@@ -648,9 +396,6 @@ with st.sidebar:
     if GEMINI_API_KEY:
         st.markdown('<div class="api-info"><span class="material-symbols-rounded mat-icon">cloud_done</span><b>Cloud Inference Active</b></div>', unsafe_allow_html=True)
 
-    memory_count = get_vector_memory_count()
-    if memory_count > 0:
-        st.markdown(f'<div class="api-info" style="background-color: #f0fdf4; border-color: #bbf7d0; color: #166534;"><span class="material-symbols-rounded mat-icon">database</span><b>SQL Server Brain:</b> {memory_count} semantic vectors stored</div>', unsafe_allow_html=True)
 
     if st.button(":material/delete: Clear History", use_container_width=True):
         st.session_state.messages = []
@@ -704,13 +449,12 @@ for i, msg in enumerate(st.session_state.messages):
     avatar_icon = "✨" if msg["role"] == "assistant" else "👤"
     with st.chat_message(msg["role"], avatar=avatar_icon):
         if "metadata" in msg:
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3 = st.columns(3)
             c1.metric("⏱️ Latency", f"{msg['metadata']['time']}s")
             escalations = len(msg['metadata'].get('escalation_log', []))
-            confidence_label = "Memory Hit" if msg["metadata"].get("memory_used") else ("1st Try ✓" if escalations == 0 else f"After {escalations} retries")
+            confidence_label = "1st Try ✓" if escalations == 0 else f"After {escalations} retries"
             c2.metric("🎯 Result", confidence_label)
             c3.metric("🧠 Agent", msg['metadata']['agent'])
-            c4.metric("📚 Memory Assist", f"{msg['metadata'].get('memory_ratio', 0):.1f}% Match" if msg["metadata"].get("memory_used") else "None")
             
             with st.expander("🔍 View SQL Execution Details"):
                 st.write(f"**Strategy:** {msg['metadata'].get('reasoning', 'N/A')}")
@@ -743,16 +487,6 @@ for i, msg in enumerate(st.session_state.messages):
         if msg["role"] == "assistant" and "metadata" in msg:
             feedback_key = f"fb_{i}"
             feedback = st.feedback("thumbs", key=feedback_key)
-            
-            if feedback is not None and not msg.get("feedback_saved"):
-                is_positive = (feedback == 1)
-                clean_query = msg["metadata"].get("standalone_query", st.session_state.messages[i-1]["content"])
-                
-                save_vector_memory(clean_query, msg["metadata"]["sql"], msg["metadata"]["domain"], msg["metadata"]["agent"], is_positive)
-                msg["feedback_saved"] = True
-                if is_positive: st.toast("Embedded and saved to SQL Server Vector Engine! 🧠", icon="✅")
-                time.sleep(0.5) 
-                st.rerun()
 
     if msg["role"] == "assistant":
         st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
@@ -794,16 +528,13 @@ if final_query:
         
         if result:
             latency = round(time.time() - start_time, 2)
-            memory_used = result.get("memory_used", False)
-            memory_ratio = result.get("memory_ratio", 0)
 
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3 = st.columns(3)
             c1.metric("⏱️ Latency", f"{latency}s")
             escalations = len(result.get("escalation_log", []))
-            confidence_label = "Memory Hit" if memory_used else ("1st Try ✓" if escalations == 0 else f"After {escalations} retries")
+            confidence_label = "1st Try ✓" if escalations == 0 else f"After {escalations} retries"
             c2.metric("🎯 Result", confidence_label)
             c3.metric("🧠 Agent", result['agent'])
-            c4.metric("📚 Memory Assist", f"{memory_ratio:.1f}% Match" if memory_used else "None")
             
             summary_prompt = f"Summarize these findings in 2-3 short bullet points. No markdown tables. Data: {result['df'].head(5).to_dict()}. Query: {standalone_query}"
             summary = generate_ai_response(result['agent'], "Helpful BI Analyst", summary_prompt)
@@ -846,8 +577,6 @@ if final_query:
                     "sql":              result['sql'],
                     "reasoning":        result['reasoning'],
                     "domain":           domain,
-                    "memory_used":      memory_used,
-                    "memory_ratio":     memory_ratio,
                     "standalone_query": standalone_query,
                     "escalation_log":   result.get("escalation_log", []),
                     "was_limited":      was_limited,      # persist for chat history redisplay
