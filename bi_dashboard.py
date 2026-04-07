@@ -78,7 +78,8 @@ SQL_USER        = os.getenv("SQL_USER")
 SQL_PASSWORD    = os.getenv("SQL_PASSWORD")
 PG_PASSWORD     = os.getenv("PG_PASSWORD")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY")
+# Azure App Service uses GOOGLE_API_KEY; also accept GEMINI_API_KEY as fallback
+GEMINI_API_KEY    = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 MINIMAX_API_KEY   = os.getenv("MINIMAX_API_KEY")
 
 # Initialize session state
@@ -90,7 +91,79 @@ if "user_query" not in st.session_state:
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# --- 2. PAGE CONFIGURATION & STYLING ---
+# --- 2. VECTOR MEMORY (Azure SQL) ---
+# Memory stores question+SQL pairs so the app learns from past queries.
+# Think of it like a query cache in SQL: "we've seen this question before, here's what worked."
+# All memory lives in a table called AgentMemory inside your Azure SQL database.
+
+from sqlalchemy import text as _sql_text
+
+def _get_memory_engine():
+    """Get a SQLAlchemy engine pointing at Azure SQL for memory operations."""
+    try:
+        all_dbs = dbc.get_all_databases()
+        azure_cfg = next((v for v in all_dbs.values() if v.get("type") == "mssql" and v.get("enabled")), None)
+        if not azure_cfg:
+            return None
+        db_key = next(k for k, v in all_dbs.items() if v is azure_cfg)
+        return dbc.build_engine(db_key, azure_cfg)
+    except Exception:
+        return None
+
+def _ensure_memory_table():
+    """Create AgentMemory table if it doesn't already exist (safe to call every startup)."""
+    engine = _get_memory_engine()
+    if not engine:
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(_sql_text("""
+                IF NOT EXISTS (
+                    SELECT 1 FROM sysobjects WHERE name='AgentMemory' AND xtype='U'
+                )
+                CREATE TABLE AgentMemory (
+                    id          INT IDENTITY(1,1) PRIMARY KEY,
+                    question    NVARCHAR(MAX),
+                    sql_query   NVARCHAR(MAX),
+                    domain      NVARCHAR(100),
+                    feedback    INT DEFAULT 1,
+                    created_at  DATETIME DEFAULT GETDATE()
+                )
+            """))
+    except Exception:
+        pass  # Non-fatal: app works even if memory table can't be created
+
+def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) -> bool:
+    """Save a successful question+SQL pair to Azure SQL memory table."""
+    engine = _get_memory_engine()
+    if not engine:
+        return False
+    try:
+        with engine.begin() as conn:
+            conn.execute(_sql_text("""
+                INSERT INTO AgentMemory (question, sql_query, domain, feedback)
+                VALUES (:q, :s, :d, :f)
+            """), {"q": question[:2000], "s": sql[:4000], "d": domain, "f": feedback})
+        return True
+    except Exception:
+        return False
+
+def get_memory_count() -> int:
+    """Return how many memories are stored in Azure SQL."""
+    engine = _get_memory_engine()
+    if not engine:
+        return 0
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(_sql_text("SELECT COUNT(*) FROM AgentMemory"))
+            return result.scalar() or 0
+    except Exception:
+        return 0
+
+# Create the table at startup (no-op if it already exists)
+_ensure_memory_table()
+
+# --- 2b. PAGE CONFIGURATION & STYLING ---
 # st.set_page_config is handled by app.py (the navigation entry point)
 
 st.markdown("""
@@ -381,6 +454,14 @@ with st.sidebar:
     if GEMINI_API_KEY:
         st.markdown('<div class="api-info"><span class="material-symbols-rounded mat-icon">cloud_done</span><b>Cloud Inference Active</b></div>', unsafe_allow_html=True)
 
+    # Memory counter — shows how many question+SQL pairs are stored in Azure SQL
+    _mem_count = get_memory_count()
+    st.markdown(
+        f'<div class="api-info"><span class="material-symbols-rounded mat-icon">psychology</span>'
+        f'<b>SQL Brain:</b> {_mem_count} semantic vectors stored</div>',
+        unsafe_allow_html=True
+    )
+
 
     if st.button(":material/delete: Clear History", use_container_width=True):
         st.session_state.messages = []
@@ -459,6 +540,14 @@ for i, msg in enumerate(st.session_state.messages):
         if msg["role"] == "assistant" and "metadata" in msg:
             feedback_key = f"fb_{i}"
             feedback = st.feedback("thumbs", key=feedback_key)
+            # feedback == 1 means thumbs up — save this question+SQL as a good memory
+            if feedback == 1:
+                save_vector_memory(
+                    question=msg["metadata"].get("standalone_query", msg.get("content", "")),
+                    sql=msg["metadata"].get("sql", ""),
+                    domain=msg["metadata"].get("domain", ""),
+                    feedback=1,
+                )
 
     if msg["role"] == "assistant":
         st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
