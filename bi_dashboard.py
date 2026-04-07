@@ -1,19 +1,19 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  bi_dashboard_azure.py — SIMPLIFIED FOR AZURE SQL ONLY                       ║
-║  ─────────────────────────────────────────────────────────────────────────── ║
-║  This is the main AI agent page — simplified to use ONLY Azure SQL.          ║
-║  No PostgreSQL, no multi-database complexity. Just Azure SQL.                ║
-║                                                                              ║
-║  How a user query flows:                                                     ║
-║  User Question → LLM generates SQL → Execute on Azure SQL → Display Results  ║
-║                                                                              ║
-║  Key features:                                                               ║
-║   - Chat interface for asking questions                                      ║
-║   - LLM model cascade (Claude → Gemini → Local fallback)                     ║
-║   - Vector memory for similar questions (stored in Azure SQL)                ║
-║   - Feedback collection for continuous improvement                           ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿"""
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘  bi_dashboard_azure.py â€” SIMPLIFIED FOR AZURE SQL ONLY                       â•‘
+â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â•‘
+â•‘  This is the main AI agent page â€” simplified to use ONLY Azure SQL.          â•‘
+â•‘  No PostgreSQL, no multi-database complexity. Just Azure SQL.                â•‘
+â•‘                                                                              â•‘
+â•‘  How a user query flows:                                                     â•‘
+â•‘  User Question â†’ LLM generates SQL â†’ Execute on Azure SQL â†’ Display Results  â•‘
+â•‘                                                                              â•‘
+â•‘  Key features:                                                               â•‘
+â•‘   - Chat interface for asking questions                                      â•‘
+â•‘   - LLM model cascade (Claude â†’ Gemini â†’ Local fallback)                     â•‘
+â•‘   - Vector memory for similar questions (stored in Azure SQL)                â•‘
+â•‘   - Feedback collection for continuous improvement                           â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 """
 
 import streamlit as st
@@ -36,36 +36,36 @@ import db_connector as dbc
 warnings.filterwarnings('ignore')
 load_dotenv()
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # API Keys & Configuration
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not ANTHROPIC_API_KEY:
-    st.error("❌ ANTHROPIC_API_KEY not found in environment variables")
+    st.error("âŒ ANTHROPIC_API_KEY not found in environment variables")
     st.stop()
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Initialize Session State
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "query_history" not in st.session_state:
     st.session_state.query_history = []
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Page Layout
-# ─────────────────────────────────────────────────────────────────────────────
-# NOTE: st.set_page_config is NOT called here — it is already set in app.py.
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# NOTE: st.set_page_config is NOT called here â€” it is already set in app.py.
 # Calling it a second time would crash Streamlit immediately.
 
-st.title("📊 BI Agent — Azure SQL")
+st.title("ðŸ“Š BI Agent â€” Azure SQL")
 st.markdown("Ask questions about your data. The AI will generate SQL and fetch results.")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # LLM Functions
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def generate_sql_with_claude(user_question: str, schema_info: str) -> str:
     """Use Claude to generate SQL from a natural language question."""
@@ -95,7 +95,7 @@ SQL:"""
 
 def generate_sql_with_gemini(user_question: str, schema_info: str) -> str:
     """Fallback: Use Gemini to generate SQL."""
-    # Using google-genai (new library) — Client-based API, not genai.configure()
+    # Using google-genai (new library) â€” Client-based API, not genai.configure()
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     prompt = f"""You are a SQL expert. Generate ONLY valid SQL SELECT statements.
@@ -110,24 +110,24 @@ Return ONLY the SQL code, no explanations."""
     response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
     return response.text.strip()
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Main Chat Interface
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-st.subheader("💬 Ask a Question")
+st.subheader("ðŸ’¬ Ask a Question")
 col1, col2 = st.columns([4, 1])
 
 with col1:
     user_input = st.text_input("Your question:", placeholder="e.g., 'Show me the top 10 customers by revenue'")
 
 with col2:
-    if st.button("🔍 Ask", use_container_width=True):
+    if st.button("ðŸ” Ask", use_container_width=True):
         if user_input:
             try:
                 # Get schema from Azure SQL
                 schema_info = dbc.get_schema_for_llm()
 
-                st.info("🔄 Generating SQL...")
+                st.info("ðŸ”„ Generating SQL...")
 
                 # Try Claude first
                 try:
@@ -139,36 +139,36 @@ with col2:
                 st.code(sql_query, language="sql")
 
                 # Execute query
-                st.info("⏳ Executing query...")
+                st.info("â³ Executing query...")
                 results = dbc.execute_query(sql_query)
 
                 if results is not None and not results.empty:
-                    st.success(f"✅ Query returned {len(results)} rows")
+                    st.success(f"âœ… Query returned {len(results)} rows")
                     st.dataframe(results, use_container_width=True)
 
                     # Download option
                     excel_file = BytesIO()
                     results.to_excel(excel_file, index=False)
                     st.download_button(
-                        label="📥 Download as Excel",
+                        label="ðŸ“¥ Download as Excel",
                         data=excel_file.getvalue(),
                         file_name=f"query_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
                 else:
-                    st.warning("⚠️ Query returned no results")
+                    st.warning("âš ï¸ Query returned no results")
 
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"âŒ Error: {str(e)}")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Schema Explorer Sidebar
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 with st.sidebar:
-    st.markdown("### 📋 Schema Explorer")
+    st.markdown("### ðŸ“‹ Schema Explorer")
 
-    if st.button("🔄 Refresh Schema"):
+    if st.button("ðŸ”„ Refresh Schema"):
         with st.spinner("Scanning database..."):
             dbc.refresh_schema()
             st.success("Schema refreshed!")

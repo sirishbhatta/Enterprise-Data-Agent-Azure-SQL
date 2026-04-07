@@ -1,0 +1,7 @@
+azure-functions
+pyodbc
+sqlalchemy
+pandas
+openpyxl
+PyYAML
+azure-storage-blob

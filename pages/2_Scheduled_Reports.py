@@ -1,14 +1,14 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  pages/2_Scheduled_Reports.py — SCHEDULED REPORTS (Azure SQL Only)          ║
-║  ─────────────────────────────────────────────────────────────────────────── ║
-║  Save SQL queries as named reports and run them on demand.                   ║
-║                                                                              ║
-║  How it works:                                                               ║
-║   1. Fill in a form: name, description, and the SQL query.                  ║
-║   2. The report is saved to saved_reports.json in the project folder.        ║
-║   3. Click "Run Now" → executes the query → saves Excel to reports_output/.  ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿"""
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘  pages/2_Scheduled_Reports.py â€” SCHEDULED REPORTS (Azure SQL Only)          â•‘
+â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â•‘
+â•‘  Save SQL queries as named reports and run them on demand.                   â•‘
+â•‘                                                                              â•‘
+â•‘  How it works:                                                               â•‘
+â•‘   1. Fill in a form: name, description, and the SQL query.                  â•‘
+â•‘   2. The report is saved to saved_reports.json in the project folder.        â•‘
+â•‘   3. Click "Run Now" â†’ executes the query â†’ saves Excel to reports_output/.  â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 """
 
 import streamlit as st
@@ -19,17 +19,17 @@ from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 
-# ── Import Azure SQL connector ────────────────────────────────────────────────
+# â”€â”€ Import Azure SQL connector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import db_connector as dbc
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# â”€â”€ Paths â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 BASE_DIR       = Path(__file__).parent.parent
 REPORTS_FILE   = BASE_DIR / "saved_reports.json"
 REPORTS_OUTPUT = BASE_DIR / "reports_output"
 REPORTS_OUTPUT.mkdir(exist_ok=True)
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def load_reports() -> list:
     """Load saved reports from JSON file."""
@@ -67,9 +67,9 @@ def run_report(report: dict) -> dict:
     except Exception as e:
         return {"success": False, "data": None, "error": str(e), "file": None}
 
-# ── Page layout ───────────────────────────────────────────────────────────────
+# â”€â”€ Page layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-st.title("📅 Scheduled Reports")
+st.title("ðŸ“… Scheduled Reports")
 st.caption("Save SQL queries as named reports and run them on demand against Azure SQL.")
 
 # Session state
@@ -78,13 +78,13 @@ if "show_add_form" not in st.session_state:
 if "run_results" not in st.session_state:
     st.session_state.run_results = {}
 
-# ── Add New Report ────────────────────────────────────────────────────────────
+# â”€â”€ Add New Report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 col_hdr, col_btn = st.columns([6, 2])
 with col_hdr:
-    st.subheader("📋 Saved Reports")
+    st.subheader("ðŸ“‹ Saved Reports")
 with col_btn:
-    if st.button("➕ Add Report", use_container_width=True):
+    if st.button("âž• Add Report", use_container_width=True):
         st.session_state.show_add_form = not st.session_state.show_add_form
 
 if st.session_state.show_add_form:
@@ -94,7 +94,7 @@ if st.session_state.show_add_form:
         report_desc = st.text_area("Description", placeholder="What does this report show?", height=60)
         report_sql  = st.text_area("SQL Query *", placeholder="SELECT TOP 100 * FROM Claims", height=120)
 
-        submitted = st.form_submit_button("💾 Save Report")
+        submitted = st.form_submit_button("ðŸ’¾ Save Report")
         if submitted:
             if not report_name.strip():
                 st.error("Report name is required.")
@@ -112,20 +112,20 @@ if st.session_state.show_add_form:
                 })
                 save_reports(reports)
                 st.session_state.show_add_form = False
-                st.success(f"✅ Report '{report_name}' saved!")
+                st.success(f"âœ… Report '{report_name}' saved!")
                 st.rerun()
 
-# ── Report List ───────────────────────────────────────────────────────────────
+# â”€â”€ Report List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 reports = load_reports()
 
 if not reports:
-    st.info("No reports yet. Click ➕ Add Report to create one.")
+    st.info("No reports yet. Click âž• Add Report to create one.")
 else:
     for i, report in enumerate(reports):
-        with st.expander(f"📄 {report['name']}", expanded=False):
-            st.markdown(f"**Description:** {report.get('description', '—')}")
-            st.markdown(f"**Created:** {report.get('created_at', '—')[:10]}")
+        with st.expander(f"ðŸ“„ {report['name']}", expanded=False):
+            st.markdown(f"**Description:** {report.get('description', 'â€”')}")
+            st.markdown(f"**Created:** {report.get('created_at', 'â€”')[:10]}")
             if report.get("last_run"):
                 st.markdown(f"**Last Run:** {report['last_run'][:19]}")
 
@@ -134,7 +134,7 @@ else:
             col_run, col_del = st.columns([1, 1])
 
             with col_run:
-                if st.button("▶️ Run Now", key=f"run_{i}", use_container_width=True):
+                if st.button("â–¶ï¸ Run Now", key=f"run_{i}", use_container_width=True):
                     with st.spinner("Running query..."):
                         result = run_report(report)
                         st.session_state.run_results[i] = result
@@ -143,7 +143,7 @@ else:
                             save_reports(reports)
 
             with col_del:
-                if st.button("🗑️ Delete", key=f"del_{i}", use_container_width=True):
+                if st.button("ðŸ—‘ï¸ Delete", key=f"del_{i}", use_container_width=True):
                     reports.pop(i)
                     save_reports(reports)
                     st.rerun()
@@ -153,14 +153,14 @@ else:
                 result = st.session_state.run_results[i]
                 if result["success"]:
                     df = result["data"]
-                    st.success(f"✅ {len(df)} rows returned")
+                    st.success(f"âœ… {len(df)} rows returned")
                     st.dataframe(df, use_container_width=True)
                     st.download_button(
-                        label="📥 Download Excel",
+                        label="ðŸ“¥ Download Excel",
                         data=df_to_excel_bytes(df),
                         file_name=f"{report['name'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_{i}"
                     )
                 else:
-                    st.error(f"❌ {result['error']}")
+                    st.error(f"âŒ {result['error']}")
