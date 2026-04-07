@@ -111,16 +111,52 @@ def _get_memory_engine():
         return None
 
 def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) -> bool:
-    """Save a thumbs-up question+SQL pair into the existing ai_query_cache table."""
+    """Save a thumbs-up question+SQL pair into the existing ai_query_cache table.
+
+    Also generates a 768-dim embedding via Gemini text-embedding-004 so the
+    question_embedding VECTOR(768, float32) column is populated for future
+    semantic search / memory retrieval.
+
+    Think of it like this in SQL terms:
+        INSERT INTO ai_query_cache (user_question, sql_code, question_embedding, created_at)
+        VALUES (:q, :s, CAST(:json_array AS VECTOR(768)), GETDATE())
+
+    The JSON array '[0.12, -0.34, ...]' is how Azure SQL accepts VECTOR literals.
+    """
     engine = _get_memory_engine()
     if not engine:
         return False
+
+    # --- Generate embedding via Gemini text-embedding-004 ---
+    # text-embedding-004 outputs exactly 768 floats — matches VECTOR(768, float32).
+    # This is the cloud equivalent of nomic-embed-text (which your local app uses via Ollama).
+    # We already have GOOGLE_API_KEY in Azure, so no extra credential needed.
+    embedding_json = None
+    if gemini_client:
+        try:
+            emb_response = gemini_client.models.embed_content(
+                model="text-embedding-004",
+                contents=question[:500],
+            )
+            embedding_vector = emb_response.embeddings[0].values  # list of 768 floats
+            embedding_json = json.dumps(embedding_vector)
+        except Exception:
+            pass  # embedding is optional — still save text memory if embedding fails
+
     try:
         with engine.begin() as conn:
-            conn.execute(_sql_text("""
-                INSERT INTO ai_query_cache (user_question, sql_code, created_at)
-                VALUES (:q, :s, GETDATE())
-            """), {"q": question[:500], "s": sql})
+            if embedding_json:
+                # Azure SQL accepts VECTOR literals as JSON arrays via CAST
+                conn.execute(_sql_text("""
+                    INSERT INTO ai_query_cache (user_question, sql_code, question_embedding, created_at)
+                    VALUES (:q, :s, CAST(:vec AS VECTOR(768)), GETDATE())
+                """), {"q": question[:500], "s": sql, "vec": embedding_json})
+            else:
+                # Fallback: save without embedding if Gemini call failed
+                conn.execute(_sql_text("""
+                    INSERT INTO ai_query_cache (user_question, sql_code, created_at)
+                    VALUES (:q, :s, GETDATE())
+                """), {"q": question[:500], "s": sql})
         return True
     except Exception:
         return False
@@ -514,14 +550,23 @@ for i, msg in enumerate(st.session_state.messages):
         if msg["role"] == "assistant" and "metadata" in msg:
             feedback_key = f"fb_{i}"
             feedback = st.feedback("thumbs", key=feedback_key)
-            # feedback == 1 means thumbs up — save this question+SQL as a good memory
-            if feedback == 1:
-                save_vector_memory(
+            # feedback == 1 means thumbs up.
+            # We use a session_state guard (fb_saved_{i}) to ensure we only save once
+            # per message — Streamlit re-renders the whole page and would fire this
+            # block again on every rerun if we didn't track whether we already saved.
+            # Think of it like: IF NOT EXISTS (SELECT 1 FROM saved WHERE msg_id = :i)
+            saved_key = f"fb_saved_{i}"
+            if feedback == 1 and not st.session_state.get(saved_key):
+                saved = save_vector_memory(
                     question=msg["metadata"].get("standalone_query", msg.get("content", "")),
                     sql=msg["metadata"].get("sql", ""),
                     domain=msg["metadata"].get("domain", ""),
                     feedback=1,
                 )
+                if saved:
+                    st.session_state[saved_key] = True
+                    # Rerun immediately so the sidebar counter reflects the new row
+                    st.rerun()
 
     if msg["role"] == "assistant":
         st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
