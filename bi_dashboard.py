@@ -48,6 +48,9 @@ import re         # Regular expressions — used to extract JSON from AI respons
 import sqlparse   # Pretty-prints SQL queries in the UI (adds indentation, uppercase keywords)
 import warnings
 import sys
+import logging
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logger = logging.getLogger(__name__)
 from io import BytesIO                    # Used to build Excel files in memory for download
 from datetime import datetime             # Used to timestamp downloaded filenames
 from pathlib import Path
@@ -155,11 +158,13 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
     # We check both so we don't crash if the shape changes between SDK versions.
     embedding_json = None
     if gemini_embed_client:
+        logger.info("EMBED: gemini_embed_client exists, generating embedding...")
         try:
             emb_response = gemini_embed_client.models.embed_content(
-                model="models/embedding-001",  # v1beta client — correct model path
+                model="models/text-embedding-004",  # v1beta — 768-dim embedding
                 contents=question[:500],
             )
+            logger.info(f"EMBED: Got response, type={type(emb_response).__name__}")
             # Try batch shape first, then singular shape
             if hasattr(emb_response, "embeddings") and emb_response.embeddings:
                 embedding_vector = emb_response.embeddings[0].values
@@ -173,8 +178,12 @@ def save_vector_memory(question: str, sql: str, domain: str, feedback: int = 1) 
             if not embedding_vector:
                 raise ValueError("Embedding values list is empty or None")
             embedding_json = json.dumps(list(embedding_vector))
+            logger.info(f"EMBED: Success! Vector length={len(embedding_vector)}")
         except Exception as embed_err:
+            logger.error(f"EMBED FAILED: {type(embed_err).__name__}: {embed_err}")
             _set_debug_error("EMBED", embed_err)
+    else:
+        logger.warning("EMBED: gemini_embed_client is None — GOOGLE_API_KEY missing?")
 
     try:
         with engine.begin() as conn:
