@@ -116,11 +116,11 @@ with st.sidebar:
     st.metric("Output Files", len(output_files))
 
     st.divider()
-    if st.button("➕ Add New Report", use_container_width=True):
+    if st.button("➕ Add New Report", width="stretch"):
         st.session_state.show_add_form = not st.session_state.show_add_form
         st.rerun()
 
-    if st.button("▶️ Run All Reports", use_container_width=True):
+    if st.button("▶️ Run All Reports", width="stretch"):
         if reports:
             with st.spinner("Running all reports…"):
                 for r in reports:
@@ -266,7 +266,7 @@ else:
             btn1, btn2, btn3, _ = st.columns([1, 1, 1, 3])
 
             with btn1:
-                if st.button("▶️ Run Now", key=f"run_{i}", use_container_width=True):
+                if st.button("▶️ Run Now", key=f"run_{i}", width="stretch"):
                     with st.spinner(f"Running '{report['name']}'…"):
                         res = run_report(report)
                         st.session_state.run_results[report["name"]] = res
@@ -285,13 +285,13 @@ else:
                             file_name=Path(report["last_file"]).name,
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"dl_{i}",
-                            use_container_width=True,
+                            width="stretch",
                         )
                 else:
-                    st.button("📥 Download", disabled=True, key=f"dl_dis_{i}", use_container_width=True)
+                    st.button("📥 Download", disabled=True, key=f"dl_dis_{i}", width="stretch")
 
             with btn3:
-                if st.button("🗑️ Delete", key=f"del_{i}", use_container_width=True):
+                if st.button("🗑️ Delete", key=f"del_{i}", width="stretch"):
                     reports.pop(i)
                     save_reports(reports)
                     st.rerun()
@@ -300,7 +300,7 @@ else:
             if run_res:
                 if run_res["success"] and run_res["data"] is not None:
                     st.success(f"✅ Ran successfully — {len(run_res['data'])} rows. Saved to `reports_output/`.")
-                    st.dataframe(run_res["data"].head(20), use_container_width=True)
+                    st.dataframe(run_res["data"].head(20), width="stretch")
                     st.download_button(
                         label="📥 Download this result",
                         data=df_to_excel_bytes(run_res["data"]),
@@ -328,7 +328,7 @@ if reports:
     with col_gen:
         st.write("")
         st.write("")
-        if st.button("⚙️ Generate Batch File", use_container_width=True):
+        if st.button("⚙️ Generate Batch File", width="stretch"):
             # Summarise frequencies from the saved reports
             freq = ", ".join(sorted({r.get("frequency", "On Demand") for r in reports}))
             python_exe = sys.executable

@@ -39,7 +39,7 @@ databases:
     username: sirishbhatta
     password_env: AZURE_SQL_PASSWORD
     domain: AZURE_CLAIMS
-    enabled: true
+    enabled: false
     description: Azure SQL cloud database — Claims and ProviderClaimSummary tables
   mysql_app:
     name: MySQL Application DB

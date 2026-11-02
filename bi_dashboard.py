@@ -272,7 +272,7 @@ def generate_ai_response(model_name, system_prompt, user_prompt):
     if "gemini" in model_name.lower():
         if not gemini_client: return '{"error": "GEMINI_API_KEY missing"}'
         try:
-            target_id = {"gemini-2.5-flash": "gemini-2.5-flash", "gemini-2.5-flash-lite": "gemini-2.5-flash-lite", "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview"}.get(model_name, "gemini-2.5-flash")
+            target_id = model_name  # model names in the list are the real API IDs
             res = gemini_client.models.generate_content(model=target_id, contents=user_prompt, config=types.GenerateContentConfig(system_instruction=system_prompt))
             return res.text if res.text else '{"error": "No response text"}'
         except Exception as e: return f'{{"error": "Gemini Error: {str(e)}"}}'
@@ -280,9 +280,10 @@ def generate_ai_response(model_name, system_prompt, user_prompt):
     elif any(n in model_name.lower() for n in ["claude", "sonnet", "opus", "haiku"]):
         if not anthropic_client: return '{"error": "ANTHROPIC_API_KEY missing"}'
         try:
-            target_id = {"claude-opus-4-6": "claude-opus-4-6", "claude-sonnet-4-6": "claude-sonnet-4-6", "claude-haiku-4-5": "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022": "claude-3-5-sonnet-20241022"}.get(model_name, model_name)
+            target_id = model_name  # model names in the list are the real API IDs
             res = anthropic_client.messages.create(model=target_id, max_tokens=2048, system=system_prompt, messages=[{"role": "user", "content": user_prompt}])
-            return res.content[0].text
+            text = "".join(b.text for b in res.content if getattr(b, "type", "") == "text")
+            return text if text else '{"error": "Claude returned no text"}'
         except Exception as e: return f'{{"error": "Claude Error: {str(e)}"}}'
             
     else:
@@ -364,18 +365,18 @@ def supervisor_routing(user_question, history_str, model):
     - FEDERATED: ONLY if the question explicitly requires joining data from TWO OR MORE of the above databases.
     {memory_hint}"""
 
-    raw = generate_ai_response(model, system, f"History: {history_str}\nQuestion: {user_question}")
-
-    if '"error":' in raw:
-        raw = generate_ai_response("gemma3:12b", system, f"History: {history_str}\nQuestion: {user_question}")
-
-    raw_upper = raw.upper()
-    if "FEDERATED" in raw_upper:
-        return "FEDERATED"
-    # Check all registered domains
-    for domain in sorted(ACTIVE_DOMAINS, key=len, reverse=True):
-        if domain in raw_upper:
-            return domain
+    # Try the selected model, then free fallbacks, until one gives a valid answer.
+    # Match whole words only -- "HR" used to match inside words like "THROUGH".
+    for router in dict.fromkeys([model, "gemini-3.5-flash-lite", "qwen2.5-coder:7b"]):
+        raw = generate_ai_response(router, system, f"History: {history_str}\nQuestion: {user_question}")
+        if '"error":' in raw:
+            continue
+        raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).upper()
+        if re.search(r"\bFEDERATED\b", raw):
+            return "FEDERATED"
+        found = [d for d in ACTIVE_DOMAINS if re.search(rf"\b{re.escape(d)}\b", raw)]
+        if len(found) == 1:
+            return found[0]
     # Default to first active domain
     return ACTIVE_DOMAINS[0] if ACTIVE_DOMAINS else "HR"
 
@@ -412,18 +413,27 @@ def agent_execution(user_question, domain, history_str, model):
     memory, match_ratio = check_vector_memory(user_question)
     memory_hint = f"\n[CRITICAL OVERRIDE]: Found {match_ratio:.1f}% semantic match! Past Question: '{memory['query']}'\nPast SQL:\n{memory['sql']}\nBorrow this syntax heavily!" if memory else ""
 
+    # Tell the AI which SQL dialect to write (Postgres has no YEAR(), SQL Server uses TOP, etc.)
+    if domain == "FEDERATED":
+        dialect_hint = "Each database uses its own dialect: " + ", ".join(
+            f"{d}={dbc.resolve_domain(d)[1]['type']}" for d in ACTIVE_DOMAINS if dbc.resolve_domain(d))
+    else:
+        _res = dbc.resolve_domain(domain)
+        dialect_hint = f"Target database is {_res[1]['type'].upper()}. Use ONLY {_res[1]['type']} SQL syntax and functions." if _res else ""
+
     # UPDATED: Relaxed the Join Key rule so it doesn't break aggregate GROUP BY queries
     system_prompt = f"""Senior Data Architect. Context: {context}
     1. Join key is emp_id (INT) and MemberID (VARCHAR). MemberID MUST be in quotes.
     2. FEDERATED requires BOTH queries. NO CROSS-DATABASE JOINS.
     3. FOR FEDERATED QUERIES ONLY: Include join keys in SELECT clauses. Do NOT force join keys into standard HR or CLAIMS aggregate queries!
-    4. Flat strings for SQL.{memory_hint}
+    4. Flat strings for SQL.
+    5. {dialect_hint}{memory_hint}
     Return JSON ONLY: {format_req}"""
     
     # The cascade list: try models in order. dict.fromkeys() removes duplicates
     # while preserving order, so if the user already selected "claude-sonnet-4-6"
     # it won't appear twice in the list.
-    cascade = [model, "gemini-2.5-flash", "gemini-3.1-flash-lite-preview", "claude-sonnet-4-6", "qwen2.5-coder:7b", "deepseek-r1:8b", "gemma3:12b"]
+    cascade = [model, "gemini-3.5-flash-lite", "gemini-3.5-flash", "qwen2.5-coder:14b", "gemma4:12b", "qwen2.5-coder:7b", "claude-haiku-5-5"]
     models_to_try = list(dict.fromkeys(cascade))
     escalation_log = []   # Track which models were tried and why they failed
 
@@ -433,6 +443,7 @@ def agent_execution(user_question, domain, history_str, model):
                 raw_res = generate_ai_response(current_model, system_prompt, f"History: {history_str}\nQuestion: {user_question}")
                 if '"error":' in raw_res: 
                     status.update(label=f"⚠️ {current_model} API Error", state="error")
+                    st.error(raw_res[:500])
                     escalation_log.append({"model": current_model, "error": f"API Error: {raw_res}"})
                     continue
 
@@ -518,6 +529,7 @@ def agent_execution(user_question, domain, history_str, model):
                             err_msg = " | ".join(err_msgs) if err_msgs else "AI returned no valid domain queries"
                             status.update(label=f"⚠️ {current_model} FEDERATED Error", state="error")
                             st.toast(f"{current_model} Failed: {err_msg}", icon="❌")
+                            st.error(f"Database error: {err_msg}")
                             escalation_log.append({"model": current_model, "error": err_msg})
                             continue
 
@@ -530,6 +542,27 @@ def agent_execution(user_question, domain, history_str, model):
                             plan.get("sql_server_query") or ""
                         )
                         res_db = get_db_data(target_sql, domain)
+
+                        # ── Self-correction: show the model its own DB error and let it fix the SQL once ──
+                        # Like a developer reading the error message and editing the query before giving up.
+                        if not res_db["success"] and target_sql:
+                            st.write(f"🔁 Self-correcting after error: {str(res_db['error'])[:200]}")
+                            fix_prompt = (f"Your previous SQL failed.\nSQL: {target_sql}\nDatabase error: {str(res_db['error'])[:1500]}\n"
+                                          f"Rewrite it so it runs. Question: {user_question}")
+                            fix_raw = generate_ai_response(current_model, system_prompt, fix_prompt)
+                            fix_match = re.search(r'\{.*\}', re.sub(r'<think>.*?</think>', '', fix_raw, flags=re.DOTALL), re.DOTALL)
+                            if fix_match and '"error":' not in fix_raw:
+                                try:
+                                    fixed_plan = json.loads(fix_match.group(0))
+                                    fixed_sql = str(fixed_plan.get("sql_query") or "")
+                                    if fixed_sql and fixed_sql != target_sql:
+                                        fixed_res = get_db_data(fixed_sql, domain)
+                                        if fixed_res["success"]:
+                                            escalation_log.append({"model": current_model, "error": f"Self-corrected. First attempt failed: {res_db['error']}"})
+                                            target_sql, res_db, plan = fixed_sql, fixed_res, fixed_plan
+                                except json.JSONDecodeError:
+                                    pass
+
                         if res_db["success"]:
                             return {
                                 "df":            res_db["data"],
@@ -545,10 +578,13 @@ def agent_execution(user_question, domain, history_str, model):
                         else:
                             status.update(label=f"⚠️ {current_model} DB Error", state="error")
                             st.toast(f"{current_model} Failed: {res_db['error']}", icon="❌")
+                            st.error(f"Database error: {res_db['error']}")
+                            st.code(target_sql or "(no SQL returned)", language="sql")
                             escalation_log.append({"model": current_model, "error": f"DB Error: {res_db['error']}"})
                             continue
             except Exception as e:
                 status.update(label=f"⚠️ {current_model} Execution Error", state="error")
+                st.error(f"Execution error: {e}")
                 escalation_log.append({"model": current_model, "error": f"Execution Error: {str(e)}"})
     return None
 
@@ -650,7 +686,7 @@ with st.sidebar:
     if memory_count > 0:
         st.markdown(f'<div class="api-info" style="background-color: #f0fdf4; border-color: #bbf7d0; color: #166534;"><span class="material-symbols-rounded mat-icon">database</span><b>SQL Server Brain:</b> {memory_count} semantic vectors stored</div>', unsafe_allow_html=True)
 
-    if st.button(":material/delete: Clear History", use_container_width=True):
+    if st.button(":material/delete: Clear History", width="stretch"):
         st.session_state.messages = []
         st.cache_data.clear() 
         st.rerun()
@@ -658,43 +694,42 @@ with st.sidebar:
     st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">memory</span> AI Reasoning Engine</div>', unsafe_allow_html=True)
     
     selected_model = st.selectbox("Select primary model:", [
-        "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5", "gemini-2.5-flash", 
-        "gemini-2.5-flash-lite", "gemini-3.1-flash-lite-preview", "minimax-m2.7:cloud", 
-        "gemma3:12b", "qwen2.5-coder:7b", "deepseek-r1:8b"
+        "gemini-3.5-flash-lite", "gemini-3.5-flash", "claude-haiku-5-5",
+        "qwen2.5-coder:14b", "gemma4:12b", "nemotron-3.5-bolt:e4b", "qwen2.5-coder:7b", "gemma4:31b-cloud"
     ], format_func=format_model_label)
 
     st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">payments</span> Model Cost Hierarchy</div>', unsafe_allow_html=True)
     st.markdown("""
     <div style="margin-top: 10px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #d97706;">military_tech</span> Tier 1: Elite Reasoners</b><br>
-        <span style="font-size: 0.8rem;">• <b>Claude Opus 4.6</b> / <b>Claude Sonnet 4.6</b></span>
+        <b><span class="material-symbols-rounded mat-icon" style="color: #d97706;">military_tech</span> Tier 1: Free Cloud</b><br>
+        <span style="font-size: 0.8rem;">• <b>Gemini 3.5 Flash-Lite</b> / <b>Gemini 3.5 Flash</b></span>
     </div>
     <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 1.5: Ollama Cloud (Previews)</b><br>
-        <span style="font-size: 0.8rem;">• <b>Minimax (m2.7)</b></span>
+        <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 2: Local GPU (Free)</b><br>
+        <span style="font-size: 0.8rem;">• <b>Qwen2.5 Coder 14B</b> / <b>Gemma 4 12B</b> / <b>Qwen2.5 Coder 7B</b></span>
     </div>
     <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 2: Fast & Efficient</b><br>
-        <span style="font-size: 0.8rem;">• <b>Claude Haiku 4.5</b> / <b>Gemini 2.5 Flash</b></span>
+        <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 3: Ollama Cloud (Free plan)</b><br>
+        <span style="font-size: 0.8rem;">• <b>Gemma 4 31B Cloud</b></span>
     </div>
     <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #16a34a;">dns</span> Tier 3: Local Specialists</b><br>
-        <span style="font-size: 0.8rem;">• <b>Qwen Coder</b> / <b>DeepSeek-R1</b> / <b>Gemma 3</b></span>
+        <b><span class="material-symbols-rounded mat-icon" style="color: #16a34a;">dns</span> Tier 4: Paid Backup (cheap)</b><br>
+        <span style="font-size: 0.8rem;">• <b>Claude Haiku 5.5</b></span>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">science</span> Actionable Test Suite</div>', unsafe_allow_html=True)
     
     # NEW SPECIFIC TEST QUESTIONS for the updated hr_employees schema
-    if st.button(":material/bar_chart: HR: Average Salary", use_container_width=True): 
+    if st.button(":material/bar_chart: HR: Average Salary", width="stretch"): 
         st.session_state.user_query = "What is the average salary by department?"
-    if st.button(":material/calendar_month: HR: Recent Hires", use_container_width=True): 
+    if st.button(":material/calendar_month: HR: Recent Hires", width="stretch"): 
         st.session_state.user_query = "Which employees were hired after January 1, 2024?"
-    if st.button(":material/cancel: Claims: Total Denied", use_container_width=True): 
+    if st.button(":material/cancel: Claims: Total Denied", width="stretch"): 
         st.session_state.user_query = "What is the total billed amount for claims that were Denied?"
-    if st.button(":material/health_and_safety: Claims: Top Provider", use_container_width=True): 
+    if st.button(":material/health_and_safety: Claims: Top Provider", width="stretch"): 
         st.session_state.user_query = "Which ProviderName has the highest number of approved claims?"
-    if st.button(":material/hub: Federated: High Earners Claims", use_container_width=True): 
+    if st.button(":material/hub: Federated: High Earners Claims", width="stretch"): 
         st.session_state.user_query = "Show me the names and total billed claims of employees in the Marketing department."
 
 # Chat Rendering
@@ -713,6 +748,8 @@ for i, msg in enumerate(st.session_state.messages):
             with st.expander("🔍 View SQL Execution Details"):
                 st.write(f"**Strategy:** {msg['metadata'].get('reasoning', 'N/A')}")
                 st.code(sqlparse.format(msg['metadata']['sql'], reindent=True, keyword_case='upper'), language="sql")
+                for fail in msg['metadata'].get('escalation_log', []):
+                    st.error(f"**{fail['model']}** failed: {str(fail['error'])[:800]}")
         
         st.markdown(msg["content"].replace('$', '\\$'))
         if "data" in msg and not msg["data"].empty:

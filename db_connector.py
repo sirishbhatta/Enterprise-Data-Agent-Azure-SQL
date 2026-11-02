@@ -386,6 +386,30 @@ def get_schema_for_llm(db_keys: List[str] = None) -> str:
 # Row limit injection
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _fix_limit_dialect(sql: str, db_type: str) -> str:
+    """
+    AI models often use the wrong row-limit syntax for the database
+    (LIMIT on SQL Server, TOP on Postgres). Translate it to the right one.
+    Like a SQL Server dev typing LIMIT out of habit -- we just fix it quietly.
+    """
+    s = sql.strip().rstrip(";")
+    top = re.match(r"(?is)^\s*SELECT\s+(DISTINCT\s+)?TOP\s*\(?\s*(\d+)\s*\)?\s+", s)
+    lim = re.search(r"(?is)\s+LIMIT\s+(\d+)\s*$", s)
+    if db_type == "mssql" and lim and re.match(r"(?is)^\s*SELECT\b", s):
+        n = lim.group(1)
+        s = s[:lim.start()]
+        s = re.sub(r"(?is)^\s*SELECT\s+(DISTINCT\s+)?", lambda m: f"SELECT {m.group(1) or ''}TOP {n} ", s, count=1)
+    elif db_type in ("postgresql", "mysql", "sqlite", "duckdb", "redshift", "snowflake") and top:
+        n = top.group(2)
+        s = f"SELECT {top.group(1) or ''}" + s[top.end():] + f"\nLIMIT {n}"
+    elif db_type == "oracle":
+        if lim:
+            s = s[:lim.start()] + f"\nFETCH FIRST {lim.group(1)} ROWS ONLY"
+        elif top:
+            s = f"SELECT {top.group(1) or ''}" + s[top.end():] + f"\nFETCH FIRST {top.group(2)} ROWS ONLY"
+    return s
+
+
 def _inject_row_limit(sql: str, db_type: str, max_rows: int) -> tuple:
     """
     Inject a row limit into a SQL query if one isn't already present.
@@ -431,7 +455,7 @@ def _inject_row_limit(sql: str, db_type: str, max_rows: int) -> tuple:
     elif db_type == "oracle":
         # Oracle doesn't support TOP — wrap the whole query in a subquery
         # and filter with ROWNUM. "AS __r" is the alias for the subquery.
-        modified = f"SELECT * FROM ({stripped}) AS __r WHERE ROWNUM <= {max_rows}"
+        modified = f"SELECT * FROM ({stripped}) WHERE ROWNUM <= {max_rows}"
 
     else:
         # PostgreSQL, MySQL, SQLite, DuckDB, Snowflake, BigQuery, Redshift
@@ -462,9 +486,16 @@ def execute_query(db_key: str, db_config: Dict, sql: str, max_rows: int = 500) -
     first_word = sql.strip().lstrip("-").strip().split()[0].upper()
     if first_word not in ("SELECT", "WITH", "SHOW", "DESCRIBE", "EXPLAIN"):
         return {"success": False, "error": "Only SELECT/WITH queries are permitted.", "latency": 0}
+    # A CTE can still hide a write ("WITH x AS (...) DELETE ..."), so also block write keywords anywhere.
+    # Strip string literals first so a value like 'Updated' doesn't trip the check.
+    no_strings = re.sub(r"'[^']*'", "''", sql)
+    blocked = re.search(r"(?i)\b(INSERT|UPDATE|DELETE|MERGE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|EXEC|EXECUTE|CALL|INTO)\b", no_strings)
+    if blocked:
+        return {"success": False, "error": f"Blocked: read-only app, '{blocked.group(1).upper()}' is not allowed.", "latency": 0}
 
     # ── Inject row limit (unless disabled or already present) ────────────────
     db_type = db_config.get("type", "")
+    sql = _fix_limit_dialect(sql, db_type)
     if max_rows and max_rows > 0:
         sql, was_limited = _inject_row_limit(sql, db_type, max_rows)
     else:

@@ -78,13 +78,13 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("🔄 Test All Active", use_container_width=True):
+    if st.button("🔄 Test All Active", width="stretch"):
         for k in enabled:
             ok, msg, lat = dbc.test_connection(k, all_dbs[k])
             st.session_state.test_results[k] = {"ok": ok, "msg": msg, "lat": lat}
         st.rerun()
 
-    if st.button("🗂️ Discover All Schemas", use_container_width=True):
+    if st.button("🗂️ Discover All Schemas", width="stretch"):
         with st.spinner("Scraping schemas from all active databases…"):
             results = dbc.refresh_all_schemas()
             for k, schema in results.items():
@@ -93,7 +93,7 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    if st.button("➕ Add New Database", use_container_width=True):
+    if st.button("➕ Add New Database", width="stretch"):
         st.session_state.show_add_form = not st.session_state.show_add_form
         st.rerun()
 
@@ -136,7 +136,7 @@ if st.session_state.show_add_form:
 
         btn_col1, btn_col2 = st.columns([1, 4])
         with btn_col1:
-            if st.button("💾 Save", type="primary", use_container_width=True):
+            if st.button("💾 Save", type="primary", width="stretch"):
                 if new_key and new_type:
                     registry = dbc.load_registry()
                     registry["databases"][new_key] = {
@@ -160,7 +160,7 @@ if st.session_state.show_add_form:
                 else:
                     st.error("Registry key and database type are required.")
         with btn_col2:
-            if st.button("Cancel", use_container_width=False):
+            if st.button("Cancel", width="content"):
                 st.session_state.show_add_form = False
                 st.rerun()
 
@@ -206,14 +206,14 @@ else:
         c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 1])
 
         with c1:
-            if st.button("🔌 Test Connection", key=f"test_{db_key}", use_container_width=True):
+            if st.button("🔌 Test Connection", key=f"test_{db_key}", width="stretch"):
                 with st.spinner("Testing…"):
                     ok, msg, lat = dbc.test_connection(db_key, db_config)
                 st.session_state.test_results[db_key] = {"ok": ok, "msg": msg, "lat": lat}
                 st.rerun()
 
         with c2:
-            if st.button("🗂️ Discover Schema", key=f"schema_{db_key}", use_container_width=True):
+            if st.button("🗂️ Discover Schema", key=f"schema_{db_key}", width="stretch"):
                 with st.spinner(f"Scraping {db_config.get('name', db_key)}…"):
                     schema = dbc.refresh_schema(db_key, db_config)
                 st.session_state.schema_results[db_key] = schema
@@ -227,7 +227,7 @@ else:
                     st.error(f"❌ {test_res['msg'][:80]}")
 
         with c5:
-            if st.button("Disable", key=f"disable_{db_key}", use_container_width=True):
+            if st.button("Disable", key=f"disable_{db_key}", width="stretch"):
                 registry = dbc.load_registry()
                 registry["databases"][db_key]["enabled"] = False
                 dbc.save_registry(registry)
@@ -253,7 +253,7 @@ else:
                                 "nullable": "Nullable", "primary_key": "PK"
                             })
                             st.dataframe(col_df[["Column", "Type", "PK", "Nullable"]],
-                                         use_container_width=True, hide_index=True)
+                                         width="stretch", hide_index=True)
                             if table_info.get("foreign_keys"):
                                 st.caption("Foreign Keys:")
                                 for fk in table_info["foreign_keys"]:
@@ -295,7 +295,7 @@ if placeholder_dbs:
                 st.markdown(f"**{db_config.get('name', db_key)}**")
                 st.caption(f"`{db_config['type'].upper()}` — {db_config.get('description', '')}")
 
-                if st.button("Enable & Configure", key=f"enable_{db_key}", use_container_width=True):
+                if st.button("Enable & Configure", key=f"enable_{db_key}", width="stretch"):
                     registry = dbc.load_registry()
                     registry["databases"][db_key]["enabled"] = True
                     dbc.save_registry(registry)

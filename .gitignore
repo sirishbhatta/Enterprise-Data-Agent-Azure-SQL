@@ -4,7 +4,7 @@
 
 #Python: Ignore compiled files and cache
 
-pycache/
+__pycache__/
 *.py[cod]
 *$py.class
 
@@ -24,5 +24,9 @@ Thumbs.db
 
 system_health_check.py
 
-schema_cache.jso
+schema_cache.json
 saved_reports.json
+_backup_*/
+reports_output/
+.vscode/
+*.code-workspace
