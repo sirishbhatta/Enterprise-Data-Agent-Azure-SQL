@@ -377,8 +377,28 @@ def supervisor_routing(user_question, history_str, model):
         found = [d for d in ACTIVE_DOMAINS if re.search(rf"\b{re.escape(d)}\b", raw)]
         if len(found) == 1:
             return found[0]
-    # Default to first active domain
-    return ACTIVE_DOMAINS[0] if ACTIVE_DOMAINS else "HR"
+    # Every routing model failed: say so instead of guessing a database.
+    return None
+
+def self_correct_sql(model, system_prompt, bad_sql, db_error, user_question):
+    """
+    Show the model its own failed SQL and the database's error message, and ask for one fix.
+    Returns the corrected SQL string, or None if the model's reply isn't usable.
+    """
+    fix_prompt = (f"Your previous SQL failed.\nSQL: {bad_sql}\nDatabase error: {str(db_error)[:1500]}\n"
+                  f"Rewrite it so it runs. Question: {user_question}")
+    fix_raw = generate_ai_response(model, system_prompt, fix_prompt)
+    if '"error":' in fix_raw:
+        return None
+    fix_match = re.search(r'\{.*\}', re.sub(r'<think>.*?</think>', '', fix_raw, flags=re.DOTALL), re.DOTALL)
+    if not fix_match:
+        return None
+    try:
+        fixed_sql = str(json.loads(fix_match.group(0)).get("sql_query") or "").strip()
+    except json.JSONDecodeError:
+        return None
+    return fixed_sql if fixed_sql and fixed_sql != bad_sql.strip() else None
+
 
 def agent_execution(user_question, domain, history_str, model):
     """
@@ -479,6 +499,18 @@ def agent_execution(user_question, domain, history_str, model):
                             if not res["success"]:
                                 err_msgs.append(f"{dom}: {res.get('error', 'unknown error')}")
 
+                        # Self-correct each failed domain query once, same as the single-database path
+                        for dom in list(domain_results):
+                            if not domain_results[dom]["success"]:
+                                fixed_sql = self_correct_sql(current_model, system_prompt, domain_queries[dom], domain_results[dom].get("error", ""), user_question)
+                                if fixed_sql:
+                                    fixed_res = get_db_data(fixed_sql, dom)
+                                    if fixed_res["success"]:
+                                        escalation_log.append({"model": current_model, "error": f"{dom}: self-corrected. First attempt failed: {domain_results[dom].get('error', '')}"})
+                                        domain_results[dom] = fixed_res
+                                        domain_queries[dom] = fixed_sql
+                        err_msgs = [f"{d}: {r.get('error', 'unknown error')}" for d, r in domain_results.items() if not r["success"]]
+
                         all_ok = not err_msgs and len(domain_results) >= 2
 
                         if all_ok:
@@ -543,25 +575,15 @@ def agent_execution(user_question, domain, history_str, model):
                         )
                         res_db = get_db_data(target_sql, domain)
 
-                        # ── Self-correction: show the model its own DB error and let it fix the SQL once ──
-                        # Like a developer reading the error message and editing the query before giving up.
+                        # ── Self-correction: one fix attempt using the database's own error message ──
                         if not res_db["success"] and target_sql:
                             st.write(f"🔁 Self-correcting after error: {str(res_db['error'])[:200]}")
-                            fix_prompt = (f"Your previous SQL failed.\nSQL: {target_sql}\nDatabase error: {str(res_db['error'])[:1500]}\n"
-                                          f"Rewrite it so it runs. Question: {user_question}")
-                            fix_raw = generate_ai_response(current_model, system_prompt, fix_prompt)
-                            fix_match = re.search(r'\{.*\}', re.sub(r'<think>.*?</think>', '', fix_raw, flags=re.DOTALL), re.DOTALL)
-                            if fix_match and '"error":' not in fix_raw:
-                                try:
-                                    fixed_plan = json.loads(fix_match.group(0))
-                                    fixed_sql = str(fixed_plan.get("sql_query") or "")
-                                    if fixed_sql and fixed_sql != target_sql:
-                                        fixed_res = get_db_data(fixed_sql, domain)
-                                        if fixed_res["success"]:
-                                            escalation_log.append({"model": current_model, "error": f"Self-corrected. First attempt failed: {res_db['error']}"})
-                                            target_sql, res_db, plan = fixed_sql, fixed_res, fixed_plan
-                                except json.JSONDecodeError:
-                                    pass
+                            fixed_sql = self_correct_sql(current_model, system_prompt, target_sql, res_db["error"], user_question)
+                            if fixed_sql:
+                                fixed_res = get_db_data(fixed_sql, domain)
+                                if fixed_res["success"]:
+                                    escalation_log.append({"model": current_model, "error": f"Self-corrected. First attempt failed: {res_db['error']}"})
+                                    target_sql, res_db = fixed_sql, fixed_res
 
                         if res_db["success"]:
                             return {
@@ -823,9 +845,12 @@ if final_query:
         
         with st.spinner("Supervisor analyzing intent..."):
             domain = supervisor_routing(standalone_query, agent_history_str, selected_model)
-            st.write(f"🔀 Supervisor routed to **{domain}**")
+            if domain:
+                st.write(f"🔀 Supervisor routed to **{domain}**")
+            else:
+                st.error("Couldn't decide which database this question is about, because every routing model failed. Check that Ollama is running and your API keys are set, then try again.")
             
-        result = agent_execution(standalone_query, domain, agent_history_str, selected_model)
+        result = agent_execution(standalone_query, domain, agent_history_str, selected_model) if domain else None
         
         if result:
             latency = round(time.time() - start_time, 2)
