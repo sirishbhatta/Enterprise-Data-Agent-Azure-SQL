@@ -19,7 +19,7 @@
 ║       │                                                                      ║
 ║       ▼                                                                      ║
 ║  [3] supervisor_routing() — Ask the AI: which database does this belong to?  ║
-║                              Returns: HR, CLAIMS, AZURE_CLAIMS, or FEDERATED ║
+║                              Returns: HR, CLAIMS, SALES, or FEDERATED        ║
 ║       │                                                                      ║
 ║       ▼                                                                      ║
 ║  [4] agent_execution()    — Ask the AI to write SQL for that database.       ║
@@ -245,18 +245,6 @@ FEDERATED_JOIN_CONFIGS = {
             "Cast both to string in the merge step. MemberID MUST be quoted in SQL."
         ),
     },
-    frozenset(["HR", "AZURE_CLAIMS"]): {
-        # Azure SQL has the same Claims table structure as the local SQL Server Claims DB.
-        # The join key is identical — emp_id (HR) maps to MemberID (Azure Claims).
-        "left":      "HR",
-        "right":     "AZURE_CLAIMS",
-        "left_key":  "emp_id",
-        "right_key": "memberid",
-        "hint": (
-            "JOIN KEY: hr_employees.emp_id (INT) = Azure Claims.MemberID (VARCHAR). "
-            "Cast both to string in the merge step. MemberID MUST be quoted in SQL."
-        ),
-    },
 }
 
 # --- 4. UNIFIED AI ROUTER ---
@@ -450,7 +438,7 @@ def agent_execution(user_question, domain, history_str, model):
     if domain == "FEDERATED":
         # Look up the join hint for whichever pair of active domains is configured.
         # This replaces the old hardcoded "HR+CLAIMS only" check and now supports
-        # HR+AZURE_CLAIMS (and any future pair added to FEDERATED_JOIN_CONFIGS).
+        # Any pair added to FEDERATED_JOIN_CONFIGS.
         active_set = set(ACTIVE_DOMAINS)
         for pair, cfg in FEDERATED_JOIN_CONFIGS.items():
             if pair.issubset(active_set):

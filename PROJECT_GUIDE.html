@@ -318,7 +318,7 @@ footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; 
     <span class="chip chip-orange">Configuration</span>
     <h3>The Database Phonebook</h3>
     <p>A plain-text config file (YAML format = indented key: value pairs). Lists every database: its type, hostname, username, which <code>.env</code> variable holds the password, and the domain label the AI uses for routing. <strong>Add new databases here.</strong> No Python needed.</p>
-    <p style="color:#b31412;">⚠️ Never put the actual password here — put the variable name (e.g. <code>AZURE_SQL_PASSWORD</code>) and store the value in <code>.env</code>.</p>
+    <p style="color:#b31412;">⚠️ Never put the actual password here — put the variable name (e.g. <code>SQL_PASSWORD</code>) and store the value in <code>.env</code>.</p>
   </div>
 
   <div class="file-card">
@@ -770,7 +770,7 @@ search_query = <span class="s">"""
 <p>Previously the federated query logic was hardcoded to only work with <code>HR</code> + <code>CLAIMS</code>. Now it reads from a <code>FEDERATED_JOIN_CONFIGS</code> dictionary. Adding a new database pair is just adding one entry to that dict — no other code changes needed.</p>
 <p>The AI is now given query keys named after the actual domain (<code>HR_query</code>, <code>CLAIMS_query</code>) instead of the vague <code>postgres_query</code>/<code>sql_server_query</code>. This means the AI knows exactly which database each query goes to.</p>
 
-<h3>③ Azure SQL FEDERATED Support — <code>bi_dashboard.py</code></h3>
+<h3>③ Azure SQL FEDERATED Support (retired) — <code>bi_dashboard.py</code></h3>
 <p>Added <code>frozenset(["HR", "AZURE_CLAIMS"])</code> to <code>FEDERATED_JOIN_CONFIGS</code>. Now you can ask questions like <em>"Show HR employees with their Azure Claims history"</em> and the federated engine will query PostgreSQL (HR) + Azure SQL (Claims) and merge them in Python — exactly the same way HR + local Claims works.</p>
 
 <h3>④ Row Count Warning — <code>bi_dashboard.py</code></h3>
@@ -854,8 +854,8 @@ search_query = <span class="s">"""
     </tr>
     <tr>
       <td><span class="chip chip-blue">ADDED</span></td>
-      <td>Azure SQL connection (<code>azure_sql</code> in registry)</td>
-      <td>Connected to <code>sirish-azure-sql-server.database.windows.net</code> with domain <code>AZURE_CLAIMS</code>. Verified connected at 1.65s latency.</td>
+      <td>Azure SQL connection (<code>azure_sql</code> in registry), <em>now removed</em></td>
+      <td>Connected to <code>sirish-azure-sql-server.database.windows.net</code> with domain <code>AZURE_CLAIMS</code>. Verified at the time. The Azure database was retired in November 2026 and the claims data now runs on local SQL Server.</td>
     </tr>
     <tr>
       <td><span class="chip chip-blue">ADDED</span></td>

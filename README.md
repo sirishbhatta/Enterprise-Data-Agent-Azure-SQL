@@ -155,7 +155,6 @@ start_dashboard.bat            Starts Streamlit + ngrok
 
 - Read-only database logins for each database (the app currently relies on its own keyword guard)
 - A test set of known-good questions to score each model's accuracy
-- Retiring the Azure SQL name from the repo (the Azure database was shut down; claims now run on local SQL Server)
 
 ---
 

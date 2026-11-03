@@ -576,14 +576,14 @@
                         <div class="overview-item"><strong>HR Analytics</strong> — PostgreSQL (LOCAL)</div>
                         <div class="overview-item"><strong>Healthcare Claims</strong> — SQL Server (LOCAL)</div>
                         <div class="overview-item"><strong>Oracle Sales</strong> — Oracle (LOCAL)</div>
-                        <div class="overview-item"><strong>Azure Claims</strong> — SQL Server (CLOUD)</div>
+                        <div class="overview-item"><strong>Claims</strong> — SQL Server 2025 (LOCAL)</div>
                     </div>
 
                     <div class="overview-box">
                         <div class="overview-title">🧠 Active LLM Providers (3)</div>
-                        <div class="overview-item"><strong>Claude Series</strong> — Opus, Sonnet, Haiku (Cloud | Tiered Cost)</div>
+                        <div class="overview-item"><strong>Gemini + Claude</strong> — Gemini 3.5 Flash (free tier), Claude Haiku 5.5 (paid backup)</div>
                         <div class="overview-item"><strong>Gemini Flash</strong> — Google (Cloud | Low Cost)</div>
-                        <div class="overview-item"><strong>Ollama Local</strong> — Gemma3, Qwen, DeepSeek (Free | GPU)</div>
+                        <div class="overview-item"><strong>Ollama Local</strong> — Gemma 4, Qwen2.5 Coder, Nemotron Bolt (Free | GPU)</div>
                     </div>
                 </div>
 
@@ -597,14 +597,14 @@
                         <div class="overview-item">📦 <strong>Models Installed:</strong></div>
                         <div style="margin-left: 16px; font-size: 10px;">
                             • nomic-embed-text (768 embeddings)<br>
-                            • gemma3:12b | qwen2.5-coder | deepseek-r1
+                            • gemma4:12b | qwen2.5-coder:14b | nemotron-3.5-bolt
                         </div>
                     </div>
 
                     <div class="gpu-box">
                         <div class="overview-title">⚡ GPU Usage: When It Activates</div>
                         <div class="overview-item">✅ <strong>Vector Embeddings:</strong> Every question → 768 numbers (5-10ms on GPU)</div>
-                        <div class="overview-item">✅ <strong>Local Model Inference:</strong> Qwen/DeepSeek/Gemma queries (1-3s per query)</div>
+                        <div class="overview-item">✅ <strong>Local Model Inference:</strong> Qwen/Gemma/Nemotron queries (1-3s per query)</div>
                         <div class="overview-item">✅ <strong>Scheduled Reports:</strong> Batch runs use GPU for embeddings</div>
                         <div class="overview-item">❌ <strong>Cloud Model Calls:</strong> API inference (Claude/Gemini) — no GPU needed</div>
                     </div>
@@ -850,9 +850,9 @@
 
                 <div class="card">
                     <h3>7-Tier Model Cascade</h3>
-                    <p><strong>Tier 1:</strong> Claude Sonnet (Elite)</p>
+                    <p><strong>Tier 1:</strong> Gemini 3.5 Flash (free cloud)</p>
                     <p><strong>Tier 2:</strong> Gemini Flash (Fast)</p>
-                    <p><strong>Tier 3+:</strong> Qwen, DeepSeek, Gemma (Local, Free)</p>
+                    <p><strong>Tier 3+:</strong> Qwen, Gemma, Nemotron (Local, Free)</p>
                     <p><strong>Strategy:</strong> Free local → cloud → never crash</p>
                 </div>
             </div>

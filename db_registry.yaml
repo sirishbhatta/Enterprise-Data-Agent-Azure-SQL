@@ -31,16 +31,6 @@ databases:
     domain: SALES
     enabled: true
     description: Sales CRM — customers, orders, products, reps, revenue, activities
-  azure_sql:
-    name: Azure SQL (Claims)
-    type: mssql
-    host: sirish-azure-sql-server.database.windows.net
-    database: sirish_azure_sql_db
-    username: sirishbhatta
-    password_env: AZURE_SQL_PASSWORD
-    domain: AZURE_CLAIMS
-    enabled: false
-    description: Azure SQL cloud database — Claims and ProviderClaimSummary tables
   mysql_app:
     name: MySQL Application DB
     type: mysql
