@@ -178,7 +178,7 @@ TEST_QUESTIONS = {
     "HR: Recent Hires": "Which employees were hired after January 1, 2024?",
     "Claims: Total Denied": "What is the total billed amount for claims that were Denied?",
     "Claims: Top Provider": "Which ProviderName has the highest number of approved claims?",
-    "Federated: High Earners": "Show me the names and total billed claims of employees in the Marketing department.",
+    "Federated: Marketing Claims": "Show me the names and total billed claims of employees in the Marketing department.",
 }
 
 def _pick_test_question():
