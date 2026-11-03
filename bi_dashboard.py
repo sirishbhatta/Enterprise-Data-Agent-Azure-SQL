@@ -385,9 +385,12 @@ def self_correct_sql(model, system_prompt, bad_sql, db_error, user_question):
     Show the model its own failed SQL and the database's error message, and ask for one fix.
     Returns the corrected SQL string, or None if the model's reply isn't usable.
     """
+    # Ask a DIFFERENT model to fix the SQL. The model that just failed is less likely to fix its own mistake.
+    fix_models = ["qwen2.5-coder:14b", "gemma4:12b", "qwen2.5-coder:7b", "gemini-3.5-flash-lite"]
+    fix_model = next((m for m in fix_models if m != model), fix_models[0])
     fix_prompt = (f"Your previous SQL failed.\nSQL: {bad_sql}\nDatabase error: {str(db_error)[:1500]}\n"
                   f"Rewrite it so it runs. Question: {user_question}")
-    fix_raw = generate_ai_response(model, system_prompt, fix_prompt)
+    fix_raw = generate_ai_response(fix_model, system_prompt, fix_prompt)
     if '"error":' in fix_raw:
         return None
     fix_match = re.search(r'\{.*\}', re.sub(r'<think>.*?</think>', '', fix_raw, flags=re.DOTALL), re.DOTALL)
