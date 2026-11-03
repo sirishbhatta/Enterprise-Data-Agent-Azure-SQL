@@ -786,9 +786,10 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     
-    with st.expander("Test questions", expanded=True):
-        st.pills("Try a question", list(TEST_QUESTIONS), selection_mode="single",
-                 key="test_pick", on_change=_pick_test_question)
+# Test questions in the main page (not the sidebar), so they're visible on phones and to new users
+st.caption("Try a question:")
+st.pills("Try a question", list(TEST_QUESTIONS), selection_mode="single",
+         key="test_pick", on_change=_pick_test_question, label_visibility="collapsed")
 
 # Chat Rendering
 chat_box = st.container(height=640, autoscroll=True)
