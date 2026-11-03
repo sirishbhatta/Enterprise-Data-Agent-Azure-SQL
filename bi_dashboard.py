@@ -826,8 +826,8 @@ with chat_box:
                 st.dataframe(msg["data"], width='stretch')
 
                 # Row-cap notice — shown when the result was automatically truncated
-                if msg.get("metadata", {}).get("was_limited"):
-                    max_r = msg["metadata"].get("max_rows", MAX_ROWS)
+                max_r = msg.get("metadata", {}).get("max_rows", MAX_ROWS)
+                if msg.get("metadata", {}).get("was_limited") and len(msg["data"]) >= max_r:
                     st.warning(
                         f"⚠️ Results capped at **{max_r} rows**. "
                         "Your query likely matched more data — add a WHERE clause or ask for a specific filter to narrow it down.",
@@ -942,7 +942,7 @@ if final_query:
             # We warn the user so they know they might not be seeing all data.
             was_limited = result.get("was_limited", False)
             max_r       = result.get("max_rows", MAX_ROWS)
-            if was_limited:
+            if was_limited and len(result['df']) >= max_r:
                 st.warning(
                     f"⚠️ Results capped at **{max_r} rows**. "
                     "Your query matched more data — add a WHERE clause or specify a filter to narrow it down.",
