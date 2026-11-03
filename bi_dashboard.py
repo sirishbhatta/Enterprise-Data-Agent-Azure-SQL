@@ -417,6 +417,21 @@ def analyze_results(df, question):
     return None, None
 
 
+def friendly_model_name(name):
+    """Turn an internal model ID into a label a new user can read."""
+    labels = {
+        "gemini-3.5-flash-lite": "☁️ Cloud · Gemini 3.5 Flash-Lite",
+        "gemini-3.5-flash": "☁️ Cloud · Gemini 3.5 Flash",
+        "claude-haiku-5-5": "💰 Paid · Claude Haiku 5.5",
+        "qwen2.5-coder:14b": "💻 Local · Qwen2.5 Coder 14B",
+        "gemma4:12b": "💻 Local · Gemma 4 12B",
+        "nemotron-3.5-bolt:e4b": "💻 Local · Nemotron Bolt E4B",
+        "qwen2.5-coder:7b": "💻 Local · Qwen2.5 Coder 7B",
+        "gemma4:31b-cloud": "🌐 Ollama Cloud · Gemma 4 31B",
+    }
+    return labels.get(name, name)
+
+
 def self_correct_sql(model, system_prompt, bad_sql, db_error, user_question):
     """
     Show the model its own failed SQL and the database's error message, and ask for one fix.
@@ -807,15 +822,11 @@ with chat_box:
         avatar_icon = "✨" if msg["role"] == "assistant" else "👤"
         with st.chat_message(msg["role"], avatar=avatar_icon):
             if "metadata" in msg:
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("⏱️ Latency", f"{msg['metadata']['time']}s")
-                escalations = len(msg['metadata'].get('escalation_log', []))
-                confidence_label = "Memory Hit" if msg["metadata"].get("memory_used") else ("1st Try ✓" if escalations == 0 else f"After {escalations} retries")
-                c2.metric("🎯 Result", confidence_label)
-                c3.metric("🧠 Agent", msg['metadata']['agent'])
-                c4.metric("📚 Memory Assist", f"{msg['metadata'].get('memory_ratio', 0):.1f}% Match" if msg["metadata"].get("memory_used") else "None")
+                c1, c2 = st.columns(2)
+                c1.metric("⏱️ Time", f"{msg['metadata']['time']}s")
+                c2.metric("🤖 Answered by", friendly_model_name(msg['metadata']['agent']))
             
-                with st.expander("🔍 View SQL Execution Details"):
+                with st.expander("🔍 How this was answered"):
                     st.write(f"**Strategy:** {msg['metadata'].get('reasoning', 'N/A')}")
                     st.code(sqlparse.format(msg['metadata']['sql'], reindent=True, keyword_case='upper'), language="sql")
                     for fail in msg['metadata'].get('escalation_log', []):
@@ -921,13 +932,9 @@ if final_query:
             memory_used = result.get("memory_used", False)
             memory_ratio = result.get("memory_ratio", 0)
 
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("⏱️ Latency", f"{latency}s")
-            escalations = len(result.get("escalation_log", []))
-            confidence_label = "Memory Hit" if memory_used else ("1st Try ✓" if escalations == 0 else f"After {escalations} retries")
-            c2.metric("🎯 Result", confidence_label)
-            c3.metric("🧠 Agent", result['agent'])
-            c4.metric("📚 Memory Assist", f"{memory_ratio:.1f}% Match" if memory_used else "None")
+            c1, c2 = st.columns(2)
+            c1.metric("⏱️ Time", f"{latency}s")
+            c2.metric("🤖 Answered by", friendly_model_name(result['agent']))
             
             summary_prompt = f"Summarize these findings in 2-3 short bullet points. No markdown tables. Data: {result['df'].head(5).to_dict()}. Query: {standalone_query}"
             summary = generate_ai_response(result['agent'], "Helpful BI Analyst", summary_prompt)
