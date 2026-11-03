@@ -787,9 +787,18 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     
 # Test questions in the main page (not the sidebar), so they're visible on phones and to new users
-st.caption("Try a question:")
-st.pills("Try a question", list(TEST_QUESTIONS), selection_mode="single",
-         key="test_pick", on_change=_pick_test_question, label_visibility="collapsed")
+if not st.session_state.messages:
+    # First visit: a clear invitation with the questions front and centre
+    with st.container(border=True):
+        st.markdown("#### 👋 New here? Tap a question to see it work")
+        st.caption("Or type your own question in plain English, for example *average salary by department*.")
+        st.pills("Try a question", list(TEST_QUESTIONS), selection_mode="single",
+                 key="test_pick", on_change=_pick_test_question, label_visibility="collapsed")
+else:
+    # Once someone has started, keep the questions available but out of the way
+    st.caption("More questions to try")
+    st.pills("Try a question", list(TEST_QUESTIONS), selection_mode="single",
+             key="test_pick", on_change=_pick_test_question, label_visibility="collapsed")
 
 # Chat Rendering
 chat_box = st.container(height=640, autoscroll=True)
