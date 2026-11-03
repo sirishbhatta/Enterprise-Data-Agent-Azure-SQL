@@ -79,29 +79,6 @@ with st.sidebar:
         </style>
     """, unsafe_allow_html=True)
 
-    # Live DB status pills — read directly from db_registry.yaml so they
-    # always reflect the current state without any manual updates needed.
-    enabled_dbs = dbc.get_enabled_databases()
-    if enabled_dbs:
-        st.markdown("<div style='font-size:0.72rem; font-weight:700; color:#5f6368; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;'>Active Databases</div>", unsafe_allow_html=True)
-        db_type_colors = {
-            "postgresql": ("#e8f0fe", "#1a73e8"),
-            "mssql":      ("#fce8e6", "#c5221f"),
-            "oracle":     ("#fef3e2", "#e37400"),
-            "mysql":      ("#e6f4ea", "#137333"),
-            "sqlite":     ("#f3e8fd", "#7b1fa2"),
-            "duckdb":     ("#e8f5e9", "#2e7d32"),
-            "snowflake":  ("#e3f2fd", "#1565c0"),
-            "bigquery":   ("#e8f0fe", "#4285f4"),
-        }
-        pills_html = ""
-        for db_key, db_cfg in enabled_dbs.items():
-            db_type = db_cfg.get("type", "db")
-            bg, fg  = db_type_colors.get(db_type, ("#f1f3f4", "#3c4043"))
-            label   = db_cfg.get("name", db_key)
-            pills_html += f"<span style='background:{bg};color:{fg};padding:3px 9px;border-radius:20px;font-size:0.72rem;font-weight:600;margin:2px 2px;display:inline-block;'>{label}</span>"
-        st.markdown(f"<div style='margin-bottom:14px;line-height:2'>{pills_html}</div>", unsafe_allow_html=True)
-
     st.markdown("<hr style='border:none; border-top:1px solid #e8eaed; margin-bottom:4px;'>", unsafe_allow_html=True)
 
 # ── Page definitions ─────────────────────────────────────────────────────────

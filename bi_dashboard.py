@@ -762,24 +762,12 @@ with st.container(border=True):
             st.caption("None configured. Check API keys or run `ollama serve`.")
 
 with st.sidebar:
-    if GEMINI_API_KEY:
-        st.markdown('<div class="api-info"><span class="material-symbols-rounded mat-icon">cloud_done</span><b>Cloud Inference Active</b></div>', unsafe_allow_html=True)
-
-    memory_count = get_vector_memory_count()
-    if memory_count > 0:
-        st.markdown(f'<div class="api-info" style="background-color: #f0fdf4; border-color: #bbf7d0; color: #166534;"><span class="material-symbols-rounded mat-icon">database</span><b>SQL Server Brain:</b> {memory_count} semantic vectors stored</div>', unsafe_allow_html=True)
-
-    if st.button(":material/delete: Clear History", width="stretch"):
-        st.session_state.messages = []
-        st.cache_data.clear() 
-        st.rerun()
-
-    st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">memory</span> AI Reasoning Engine</div>', unsafe_allow_html=True)
-    
-    selected_model = st.selectbox("Select primary model:", [
+    # Model choice first: the one setting most people will touch
+    st.markdown("**Model**")
+    selected_model = st.selectbox("Primary model", [
         "gemini-3.5-flash-lite", "gemini-3.5-flash", "claude-haiku-5-5",
         "qwen2.5-coder:14b", "gemma4:12b", "nemotron-3.5-bolt:e4b", "qwen2.5-coder:7b", "gemma4:31b-cloud"
-    ], format_func=format_model_label)
+    ], format_func=format_model_label, help="Tried first. If it fails, the app moves down the list automatically.")
 
     with st.expander("Model tiers and costs"):
         st.markdown("""
@@ -800,6 +788,15 @@ with st.sidebar:
             <span style="font-size: 0.8rem;">• <b>Claude Haiku 5.5</b></span>
         </div>
         """, unsafe_allow_html=True)
+    with st.expander("System status"):
+        if GEMINI_API_KEY:
+            st.caption("☁️ Cloud inference: on")
+        st.caption(f"🧠 Saved good examples: {get_vector_memory_count()}")
+
+    if st.button(":material/delete: Clear chat", width="stretch"):
+        st.session_state.messages = []
+        st.cache_data.clear()
+        st.rerun()
     
 # Test questions in the main page (not the sidebar), so they're visible on phones and to new users
 if not st.session_state.messages:
