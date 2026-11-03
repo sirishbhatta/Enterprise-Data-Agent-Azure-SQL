@@ -874,6 +874,7 @@ with chat_box:
 
             if msg["role"] == "assistant" and "metadata" in msg:
                 feedback_key = f"fb_{i}"
+                st.caption("👍 saves this question and its SQL as an example for future answers. 👎 is not saved.")
                 feedback = st.feedback("thumbs", key=feedback_key)
             
                 if feedback is not None and not msg.get("feedback_saved"):
