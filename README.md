@@ -69,7 +69,7 @@ Question
 
 ## Running it
 
-**You'll need:** Windows 11, Python 3.9+, Ollama, the three databases above (or any you configure), and API keys for Gemini and (optionally) Anthropic.
+**You'll need:** Windows 11, Python 3.9+ (Streamlit 1.66 or newer), Ollama, the three databases above (or any you configure), and API keys for Gemini and (optionally) Anthropic.
 
 ```powershell
 git clone https://github.com/sirishbhatta/Enterprise-Data-Agent-Azure-SQL.git

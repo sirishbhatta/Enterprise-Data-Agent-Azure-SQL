@@ -172,6 +172,22 @@ def check_vector_memory(user_question, threshold=65.0):
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
+# Test questions shown as tappable pills in the sidebar
+TEST_QUESTIONS = {
+    "HR: Average Salary": "What is the average salary by department?",
+    "HR: Recent Hires": "Which employees were hired after January 1, 2024?",
+    "Claims: Total Denied": "What is the total billed amount for claims that were Denied?",
+    "Claims: Top Provider": "Which ProviderName has the highest number of approved claims?",
+    "Federated: High Earners": "Show me the names and total billed claims of employees in the Marketing department.",
+}
+
+def _pick_test_question():
+    """Runs when a pill is tapped: queue the question, then clear the pill so it doesn't re-run."""
+    label = st.session_state.get("test_pick")
+    if label in TEST_QUESTIONS:
+        st.session_state.user_query = TEST_QUESTIONS[label]
+    st.session_state.test_pick = None
+
 if "user_query" not in st.session_state:
     st.session_state.user_query = None
 
@@ -770,94 +786,87 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     
-    with st.expander("Test questions"):
-    
-        # NEW SPECIFIC TEST QUESTIONS for the updated hr_employees schema
-        if st.button(":material/bar_chart: HR: Average Salary", width="stretch"): 
-            st.session_state.user_query = "What is the average salary by department?"
-        if st.button(":material/calendar_month: HR: Recent Hires", width="stretch"): 
-            st.session_state.user_query = "Which employees were hired after January 1, 2024?"
-        if st.button(":material/cancel: Claims: Total Denied", width="stretch"): 
-            st.session_state.user_query = "What is the total billed amount for claims that were Denied?"
-        if st.button(":material/health_and_safety: Claims: Top Provider", width="stretch"): 
-            st.session_state.user_query = "Which ProviderName has the highest number of approved claims?"
-        if st.button(":material/hub: Federated: High Earners Claims", width="stretch"): 
-            st.session_state.user_query = "Show me the names and total billed claims of employees in the Marketing department."
+    with st.expander("Test questions", expanded=True):
+        st.pills("Try a question", list(TEST_QUESTIONS), selection_mode="single",
+                 key="test_pick", on_change=_pick_test_question)
 
 # Chat Rendering
-for i, msg in enumerate(st.session_state.messages):
-    avatar_icon = "✨" if msg["role"] == "assistant" else "👤"
-    with st.chat_message(msg["role"], avatar=avatar_icon):
-        if "metadata" in msg:
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("⏱️ Latency", f"{msg['metadata']['time']}s")
-            escalations = len(msg['metadata'].get('escalation_log', []))
-            confidence_label = "Memory Hit" if msg["metadata"].get("memory_used") else ("1st Try ✓" if escalations == 0 else f"After {escalations} retries")
-            c2.metric("🎯 Result", confidence_label)
-            c3.metric("🧠 Agent", msg['metadata']['agent'])
-            c4.metric("📚 Memory Assist", f"{msg['metadata'].get('memory_ratio', 0):.1f}% Match" if msg["metadata"].get("memory_used") else "None")
+chat_box = st.container(height=640, autoscroll=True)
+with chat_box:
+    for i, msg in enumerate(st.session_state.messages):
+        avatar_icon = "✨" if msg["role"] == "assistant" else "👤"
+        with st.chat_message(msg["role"], avatar=avatar_icon):
+            if "metadata" in msg:
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("⏱️ Latency", f"{msg['metadata']['time']}s")
+                escalations = len(msg['metadata'].get('escalation_log', []))
+                confidence_label = "Memory Hit" if msg["metadata"].get("memory_used") else ("1st Try ✓" if escalations == 0 else f"After {escalations} retries")
+                c2.metric("🎯 Result", confidence_label)
+                c3.metric("🧠 Agent", msg['metadata']['agent'])
+                c4.metric("📚 Memory Assist", f"{msg['metadata'].get('memory_ratio', 0):.1f}% Match" if msg["metadata"].get("memory_used") else "None")
             
-            with st.expander("🔍 View SQL Execution Details"):
-                st.write(f"**Strategy:** {msg['metadata'].get('reasoning', 'N/A')}")
-                st.code(sqlparse.format(msg['metadata']['sql'], reindent=True, keyword_case='upper'), language="sql")
-                for fail in msg['metadata'].get('escalation_log', []):
-                    st.error(f"**{fail['model']}** failed: {str(fail['error'])[:800]}")
+                with st.expander("🔍 View SQL Execution Details"):
+                    st.write(f"**Strategy:** {msg['metadata'].get('reasoning', 'N/A')}")
+                    st.code(sqlparse.format(msg['metadata']['sql'], reindent=True, keyword_case='upper'), language="sql")
+                    for fail in msg['metadata'].get('escalation_log', []):
+                        st.error(f"**{fail['model']}** failed: {str(fail['error'])[:800]}")
         
-        st.markdown(msg["content"].replace('$', '\\$'))
-        if "data" in msg and not msg["data"].empty:
-            st.dataframe(msg["data"], width='stretch')
+            st.markdown(msg["content"].replace('$', '\\$'))
+            if "data" in msg and not msg["data"].empty:
+                st.dataframe(msg["data"], width='stretch')
 
-            # Row-cap notice — shown when the result was automatically truncated
-            if msg.get("metadata", {}).get("was_limited"):
-                max_r = msg["metadata"].get("max_rows", MAX_ROWS)
-                st.warning(
-                    f"⚠️ Results capped at **{max_r} rows**. "
-                    "Your query likely matched more data — add a WHERE clause or ask for a specific filter to narrow it down.",
-                    icon="📊"
-                )
+                # Row-cap notice — shown when the result was automatically truncated
+                if msg.get("metadata", {}).get("was_limited"):
+                    max_r = msg["metadata"].get("max_rows", MAX_ROWS)
+                    st.warning(
+                        f"⚠️ Results capped at **{max_r} rows**. "
+                        "Your query likely matched more data — add a WHERE clause or ask for a specific filter to narrow it down.",
+                        icon="📊"
+                    )
 
-            # Download button — converts the DataFrame to Excel bytes in memory
-            ts  = msg.get("metadata", {}).get("time", "")
-            fname = f"query_results_{ts}s.xlsx".replace(" ", "_")
-            st.download_button(
-                label="📥 Download as Excel",
-                data=df_to_excel_bytes(msg["data"]),
-                file_name=fname,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"dl_{id(msg)}",    # unique key per message so buttons don't conflict
-            )
+                # Download button — converts the DataFrame to Excel bytes in memory
+                ts  = msg.get("metadata", {}).get("time", "")
+                fname = f"query_results_{ts}s.xlsx".replace(" ", "_")
+                with st.popover("📥 Export"):
+                    st.download_button(
+                        label="Download as Excel",
+                        data=df_to_excel_bytes(msg["data"]),
+                        file_name=fname,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_{id(msg)}",    # unique key per message so buttons don't conflict
+                    )
 
-            # ── On-demand AI analysis: runs only when the user clicks ──
-            an_key = f"an_{abs(hash(str(msg.get('metadata', {}).get('sql', '')) + str(ts)))}"
-            with st.expander("📊 AI Data Analysis"):
-                if st.button("Run analysis", key=f"btn_{an_key}"):
-                    with st.spinner("Analyzing results..."):
-                        text, used = analyze_results(msg["data"], msg.get("metadata", {}).get("standalone_query", ""))
-                    st.session_state[an_key] = (text, used)
-                if an_key in st.session_state:
-                    text, used = st.session_state[an_key]
-                    if text:
-                        st.caption(f"Analysis by {used}")
-                        st.markdown(text.replace('$', '\\$'))
-                    else:
-                        st.error("Analysis failed: every analysis model was unavailable.")
+                # ── On-demand AI analysis: runs only when the user clicks ──
+                an_key = f"an_{abs(hash(str(msg.get('metadata', {}).get('sql', '')) + str(ts)))}"
+                with st.expander("📊 AI Data Analysis"):
+                    if st.button("Run analysis", key=f"btn_{an_key}"):
+                        with st.spinner("Analyzing results..."):
+                            text, used = analyze_results(msg["data"], msg.get("metadata", {}).get("standalone_query", ""))
+                        st.session_state[an_key] = (text, used)
+                    if an_key in st.session_state:
+                        text, used = st.session_state[an_key]
+                        if text:
+                            st.caption(f"Analysis by {used}")
+                            st.markdown(text.replace('$', '\\$'))
+                        else:
+                            st.error("Analysis failed: every analysis model was unavailable.")
 
-        if msg["role"] == "assistant" and "metadata" in msg:
-            feedback_key = f"fb_{i}"
-            feedback = st.feedback("thumbs", key=feedback_key)
+            if msg["role"] == "assistant" and "metadata" in msg:
+                feedback_key = f"fb_{i}"
+                feedback = st.feedback("thumbs", key=feedback_key)
             
-            if feedback is not None and not msg.get("feedback_saved"):
-                is_positive = (feedback == 1)
-                clean_query = msg["metadata"].get("standalone_query", st.session_state.messages[i-1]["content"])
+                if feedback is not None and not msg.get("feedback_saved"):
+                    is_positive = (feedback == 1)
+                    clean_query = msg["metadata"].get("standalone_query", st.session_state.messages[i-1]["content"])
                 
-                save_vector_memory(clean_query, msg["metadata"]["sql"], msg["metadata"]["domain"], msg["metadata"]["agent"], is_positive)
-                msg["feedback_saved"] = True
-                if is_positive: st.toast("Embedded and saved to SQL Server Vector Engine! 🧠", icon="✅")
-                time.sleep(0.5) 
-                st.rerun()
+                    save_vector_memory(clean_query, msg["metadata"]["sql"], msg["metadata"]["domain"], msg["metadata"]["agent"], is_positive)
+                    msg["feedback_saved"] = True
+                    if is_positive: st.toast("Embedded and saved to SQL Server Vector Engine! 🧠", icon="✅")
+                    time.sleep(0.5) 
+                    st.rerun()
 
-    if msg["role"] == "assistant":
-        st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
+        if msg["role"] == "assistant":
+            st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
 
 # Main Input
 user_input = st.chat_input("Ask about your data...")

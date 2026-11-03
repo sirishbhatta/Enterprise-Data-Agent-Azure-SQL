@@ -3,7 +3,7 @@
 # ============================================================
 
 # ── Core UI & Orchestration ──────────────────────────────────
-streamlit                  # Dashboard interface
+streamlit>=1.66.0          # Dashboard interface (1.66+ for the current UI features)
 python-dotenv              # .env file loading
 
 # ── Universal DB Adapter ────────────────────────────────────
