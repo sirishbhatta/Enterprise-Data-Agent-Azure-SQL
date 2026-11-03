@@ -380,6 +380,37 @@ def supervisor_routing(user_question, history_str, model):
     # Every routing model failed: say so instead of guessing a database.
     return None
 
+# Analysis model order: free local first, then free cloud, paid last.
+ANALYSIS_MODELS = [
+    "gemma4:12b",
+    "qwen2.5-coder:14b",
+    "nemotron-3.5-bolt:e4b",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "claude-haiku-5-5",
+]
+
+def analyze_results(df, question):
+    """
+    On-demand BI analysis of a result table. Sends the first 20 rows and summary stats
+    (not the whole table) to the first analysis model that answers.
+    Returns (text, model_name), or (None, None) if every model fails.
+    """
+    sample = df.head(20).to_string()
+    stats = df.describe(include="all").to_string()
+    prompt = (f"Question asked: {question}\n\nFirst 20 rows:\n{sample}\n\n"
+              f"Summary statistics:\n{stats}\n\n"
+              "Act as a BI analyst. Give 2-3 actionable trends or outliers. "
+              "Quote only numbers that appear above. Plain English, no SQL, no tables.")
+    for m in ANALYSIS_MODELS:
+        out = generate_ai_response(m, "You are a careful BI analyst.", prompt)
+        if '"error":' not in out and out.strip():
+            clean = re.sub(r'<think>.*?</think>', '', out, flags=re.DOTALL).strip()
+            if clean:
+                return clean, m
+    return None, None
+
+
 def self_correct_sql(model, system_prompt, bad_sql, db_error, user_question):
     """
     Show the model its own failed SQL and the database's error message, and ask for one fix.
@@ -799,6 +830,21 @@ for i, msg in enumerate(st.session_state.messages):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_{id(msg)}",    # unique key per message so buttons don't conflict
             )
+
+            # ── On-demand AI analysis: runs only when the user clicks ──
+            an_key = f"an_{abs(hash(str(msg.get('metadata', {}).get('sql', '')) + str(ts)))}"
+            with st.expander("📊 AI Data Analysis"):
+                if st.button("Run analysis", key=f"btn_{an_key}"):
+                    with st.spinner("Analyzing results..."):
+                        text, used = analyze_results(msg["data"], msg.get("metadata", {}).get("standalone_query", ""))
+                    st.session_state[an_key] = (text, used)
+                if an_key in st.session_state:
+                    text, used = st.session_state[an_key]
+                    if text:
+                        st.caption(f"Analysis by {used}")
+                        st.markdown(text.replace('$', '\\$'))
+                    else:
+                        st.error("Analysis failed: every analysis model was unavailable.")
 
         if msg["role"] == "assistant" and "metadata" in msg:
             feedback_key = f"fb_{i}"
