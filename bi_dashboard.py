@@ -186,7 +186,10 @@ st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,600,0,0" rel="stylesheet" />
 <style>
 .stApp { background-color: #f8f9fa; } 
-[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #dadce0; box-shadow: 2px 0 12px rgba(0, 0, 0, 0.05); }
+[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e8eaed; }
+[data-testid="stExpander"] { border: 1px solid #e8eaed; border-radius: 12px; box-shadow: none; }
+[data-testid="stExpander"] summary { font-weight: 600; color: #3c4043; }
+h1 { letter-spacing: -0.02em; }
 .mat-icon { vertical-align: -5px; margin-right: 6px; font-size: 1.3em; }
 .sidebar-header { background: linear-gradient(135deg, #e8f0fe 0%, #ffffff 100%); border: 1px solid #d2e3fc; border-left: 6px solid #1a73e8; padding: 14px 16px; margin-top: 28px; margin-bottom: 16px; border-radius: 10px; font-weight: 700; color: #174ea6; font-size: 1rem; box-shadow: 0 2px 4px rgba(26, 115, 232, 0.05); }
 .stButton>button { border-radius: 20px; min-height: 44px; font-weight: 600; border: 1px solid #dadce0; color: #3c4043; transition: all 0.2s ease; }
@@ -715,7 +718,7 @@ with st.container(border=True):
         ollama.list() # This will throw an exception if the server is not running.
         active_providers.append("Ollama (Local)")
         # This now matches the local models available in the primary model dropdown.
-        llm_details.append("- **Gemma, Qwen Coder, DeepSeek** (Local | Open Source | Free)")
+        llm_details.append("- **Gemma, Qwen Coder, Nemotron** (Local | Open Source | Free)")
     except Exception:
         pass # Ollama not running or installed
 
@@ -725,8 +728,8 @@ with st.container(border=True):
         st.markdown(f"**<span class='material-symbols-rounded mat-icon'>database</span> Active Databases ({len(active_db_items)})**", unsafe_allow_html=True)
         st.markdown("\n".join(active_db_items))
         
-        st.markdown("<div style='margin-top: 15px; color: #5f6368;'><b><span class='material-symbols-rounded mat-icon'>extension</span> Future Add-ons</b></div>", unsafe_allow_html=True)
-        st.markdown("\n".join(future_db_items))
+        with st.expander("Future add-ons"):
+            st.markdown("\n".join(future_db_items))
     with col2:
         st.markdown(f"**<span class='material-symbols-rounded mat-icon'>psychology</span> Active LLM Providers ({len(active_providers)})**", unsafe_allow_html=True)
         if llm_details:
@@ -754,39 +757,39 @@ with st.sidebar:
         "qwen2.5-coder:14b", "gemma4:12b", "nemotron-3.5-bolt:e4b", "qwen2.5-coder:7b", "gemma4:31b-cloud"
     ], format_func=format_model_label)
 
-    st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">payments</span> Model Cost Hierarchy</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div style="margin-top: 10px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #d97706;">military_tech</span> Tier 1: Free Cloud</b><br>
-        <span style="font-size: 0.8rem;">• <b>Gemini 3.5 Flash-Lite</b> / <b>Gemini 3.5 Flash</b></span>
-    </div>
-    <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 2: Local GPU (Free)</b><br>
-        <span style="font-size: 0.8rem;">• <b>Qwen2.5 Coder 14B</b> / <b>Gemma 4 12B</b> / <b>Qwen2.5 Coder 7B</b></span>
-    </div>
-    <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 3: Ollama Cloud (Free plan)</b><br>
-        <span style="font-size: 0.8rem;">• <b>Gemma 4 31B Cloud</b></span>
-    </div>
-    <div style="margin-top: 12px;">
-        <b><span class="material-symbols-rounded mat-icon" style="color: #16a34a;">dns</span> Tier 4: Paid Backup (cheap)</b><br>
-        <span style="font-size: 0.8rem;">• <b>Claude Haiku 5.5</b></span>
-    </div>
-    """, unsafe_allow_html=True)
+    with st.expander("Model tiers and costs"):
+        st.markdown("""
+        <div style="margin-top: 10px;">
+            <b><span class="material-symbols-rounded mat-icon" style="color: #d97706;">military_tech</span> Tier 1: Free Cloud</b><br>
+            <span style="font-size: 0.8rem;">• <b>Gemini 3.5 Flash-Lite</b> / <b>Gemini 3.5 Flash</b></span>
+        </div>
+        <div style="margin-top: 12px;">
+            <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 2: Local GPU (Free)</b><br>
+            <span style="font-size: 0.8rem;">• <b>Qwen2.5 Coder 14B</b> / <b>Gemma 4 12B</b> / <b>Qwen2.5 Coder 7B</b></span>
+        </div>
+        <div style="margin-top: 12px;">
+            <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 3: Ollama Cloud (Free plan)</b><br>
+            <span style="font-size: 0.8rem;">• <b>Gemma 4 31B Cloud</b></span>
+        </div>
+        <div style="margin-top: 12px;">
+            <b><span class="material-symbols-rounded mat-icon" style="color: #16a34a;">dns</span> Tier 4: Paid Backup (cheap)</b><br>
+            <span style="font-size: 0.8rem;">• <b>Claude Haiku 5.5</b></span>
+        </div>
+        """, unsafe_allow_html=True)
     
-    st.markdown('<div class="sidebar-header"><span class="material-symbols-rounded mat-icon">science</span> Actionable Test Suite</div>', unsafe_allow_html=True)
+    with st.expander("Test questions"):
     
-    # NEW SPECIFIC TEST QUESTIONS for the updated hr_employees schema
-    if st.button(":material/bar_chart: HR: Average Salary", width="stretch"): 
-        st.session_state.user_query = "What is the average salary by department?"
-    if st.button(":material/calendar_month: HR: Recent Hires", width="stretch"): 
-        st.session_state.user_query = "Which employees were hired after January 1, 2024?"
-    if st.button(":material/cancel: Claims: Total Denied", width="stretch"): 
-        st.session_state.user_query = "What is the total billed amount for claims that were Denied?"
-    if st.button(":material/health_and_safety: Claims: Top Provider", width="stretch"): 
-        st.session_state.user_query = "Which ProviderName has the highest number of approved claims?"
-    if st.button(":material/hub: Federated: High Earners Claims", width="stretch"): 
-        st.session_state.user_query = "Show me the names and total billed claims of employees in the Marketing department."
+        # NEW SPECIFIC TEST QUESTIONS for the updated hr_employees schema
+        if st.button(":material/bar_chart: HR: Average Salary", width="stretch"): 
+            st.session_state.user_query = "What is the average salary by department?"
+        if st.button(":material/calendar_month: HR: Recent Hires", width="stretch"): 
+            st.session_state.user_query = "Which employees were hired after January 1, 2024?"
+        if st.button(":material/cancel: Claims: Total Denied", width="stretch"): 
+            st.session_state.user_query = "What is the total billed amount for claims that were Denied?"
+        if st.button(":material/health_and_safety: Claims: Top Provider", width="stretch"): 
+            st.session_state.user_query = "Which ProviderName has the highest number of approved claims?"
+        if st.button(":material/hub: Federated: High Earners Claims", width="stretch"): 
+            st.session_state.user_query = "Show me the names and total billed claims of employees in the Marketing department."
 
 # Chat Rendering
 for i, msg in enumerate(st.session_state.messages):
