@@ -80,6 +80,7 @@ ollama pull nomic-embed-text
 ollama pull qwen2.5-coder:14b
 ollama pull gemma4:12b
 ollama pull qwen2.5-coder:7b
+ollama pull nemotron-3.5-bolt:e4b
 ```
 
 Create a `.env` file:

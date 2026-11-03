@@ -25,9 +25,9 @@ oracledb                   # Oracle 21c XE — thin mode, NO Instant Client need
 # redshift_connector       # Amazon Redshift (connector)
 
 # ── AI / LLM Clients ────────────────────────────────────────
-anthropic                  # Claude (Opus, Sonnet, Haiku)
-google-genai               # Gemini (2.5 Flash, etc.)
-ollama                     # Local models (Gemma, Qwen, DeepSeek, etc.)
+anthropic                  # Claude (Haiku 5.5)
+google-genai               # Gemini (3.5 Flash-Lite, 3.5 Flash)
+ollama                     # Local models (Gemma 4, Qwen2.5 Coder, Nemotron Bolt)
 
 # ── Data & Formatting ───────────────────────────────────────
 pandas                     # DataFrame operations

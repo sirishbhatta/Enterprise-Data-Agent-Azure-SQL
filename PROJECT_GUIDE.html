@@ -517,12 +517,12 @@ footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; 
 <!-- PATH D: MODEL CASCADE -->
 <div class="flow-path cascade">
 <h3>PATH D — Model Cascade (First AI Fails, Auto-Escalation)</h3>
-<p style="font-size:0.85rem;margin-bottom:14px;">Example: You selected <em>gemma3:12b</em> (local) as primary, but the generated SQL has a syntax error on the first attempt.</p>
+<p style="font-size:0.85rem;margin-bottom:14px;">Example: You selected <em>gemma4:12b</em> (local) as primary, but the generated SQL has a syntax error on the first attempt.</p>
 <div class="flow-steps">
   <div class="fs">
     <div class="num">1</div>
     <div class="label">agent_execution() tries primary model</div>
-    <div class="sub">Sends question + schema to gemma3:12b</div>
+    <div class="sub">Sends question + schema to gemma4:12b</div>
     <div class="ex">Model returns SQL with a syntax error</div>
   </div>
   <div class="arr">›</div>
@@ -530,21 +530,21 @@ footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; 
     <div class="num">2</div>
     <div class="label">DB returns error</div>
     <div class="sub">execute_query() reports failure. Status shows ⚠️.</div>
-    <div class="ex">Toast: "gemma3:12b Failed: Invalid column name"</div>
+    <div class="ex">Toast: "gemma4:12b Failed: Invalid column name"</div>
   </div>
   <div class="arr">›</div>
   <div class="fs">
     <div class="num">3</div>
     <div class="label">Escalate to next model</div>
-    <div class="sub">Cascade list: [gemma3:12b, gemini-2.5-flash, claude-sonnet-4-6, ...]</div>
-    <div class="ex">Now tries gemini-2.5-flash</div>
+    <div class="sub">Cascade list: [gemma4:12b, gemini-3.5-flash, claude-haiku-5-5, ...]</div>
+    <div class="ex">Now tries gemini-3.5-flash</div>
   </div>
   <div class="arr">›</div>
   <div class="fs">
     <div class="num">4</div>
-    <div class="label">gemini-2.5-flash succeeds</div>
+    <div class="label">gemini-3.5-flash succeeds</div>
     <div class="sub">Returns valid SQL. DB query runs. Results returned.</div>
-    <div class="ex">Agent badge shows "gemini-2.5-flash"</div>
+    <div class="ex">Agent badge shows "gemini-3.5-flash"</div>
   </div>
   <div class="arr">›</div>
   <div class="fs">
@@ -732,20 +732,20 @@ search_query = <span class="s">"""
 <table>
   <thead><tr><th>Model</th><th>Provider</th><th>Tier</th><th>Cost</th><th>Runs On</th><th>Best For</th></tr></thead>
   <tbody>
-    <tr><td><code>claude-opus-4-6</code></td><td>Anthropic</td><td><span class="chip chip-orange">Elite</span></td><td>💰💰💰</td><td>Cloud API</td><td>Complex, ambiguous, multi-step questions</td></tr>
-    <tr><td><code>claude-sonnet-4-6</code></td><td>Anthropic</td><td><span class="chip chip-orange">Elite</span></td><td>💰💰</td><td>Cloud API</td><td>Best balance of quality + speed + cost</td></tr>
-    <tr><td><code>gemini-2.5-flash</code></td><td>Google</td><td><span class="chip chip-blue">Fast</span></td><td>💰</td><td>Cloud API</td><td>Fallback workhorse, high volume, fast</td></tr>
-    <tr><td><code>claude-haiku-4-5</code></td><td>Anthropic</td><td><span class="chip chip-blue">Fast</span></td><td>💰</td><td>Cloud API</td><td>Routing decisions, query rewrites</td></tr>
-    <tr><td><code>gemma3:12b</code></td><td>Google/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Offline use, general reasoning</td></tr>
-    <tr><td><code>qwen2.5-coder:7b</code></td><td>Alibaba/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Code/SQL generation (trained on code)</td></tr>
-    <tr><td><code>deepseek-r1:8b</code></td><td>DeepSeek/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Reasoning chains, step-by-step problems</td></tr>
+    <tr><td><code>gemini-3.5-flash-lite</code></td><td>Google</td><td><span class="chip chip-blue">Free tier</span></td><td>🆓</td><td>Cloud API</td><td>Fast first try, SQL writing</td></tr>
+    <tr><td><code>gemini-3.5-flash</code></td><td>Google</td><td><span class="chip chip-blue">Free tier</span></td><td>🆓</td><td>Cloud API</td><td>Stronger fallback</td></tr>
+    <tr><td><code>qwen2.5-coder:14b</code></td><td>Alibaba/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Code and SQL generation</td></tr>
+    <tr><td><code>gemma4:12b</code></td><td>Google/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>General reasoning, analysis summaries</td></tr>
+    <tr><td><code>nemotron-3.5-bolt:e4b</code></td><td>NVIDIA/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Small and fast, strong structured output</td></tr>
+    <tr><td><code>qwen2.5-coder:7b</code></td><td>Alibaba/Ollama</td><td><span class="chip chip-green">Local</span></td><td>🆓 Free</td><td>Your RTX 3060</td><td>Quick backup for SQL</td></tr>
+    <tr><td><code>claude-haiku-5-5</code></td><td>Anthropic</td><td><span class="chip chip-orange">Paid</span></td><td>💰</td><td>Cloud API</td><td>Last resort when everything else fails</td></tr>
   </tbody>
 </table>
 
 <div class="info-box info-blue" style="margin-top:16px;">
   <strong>📌 Cascade order in agent_execution():</strong><br>
-  [your selected model] → gemini-2.5-flash → gemini-3.1-flash-lite-preview → claude-sonnet-4-6 → qwen2.5-coder:7b → deepseek-r1:8b → gemma3:12b<br>
-  <span style="font-size:0.82rem;opacity:0.8;">Duplicates are removed automatically, so if you select claude-sonnet-4-6 it won't appear twice.</span>
+  [your selected model] → gemini-3.5-flash-lite → gemini-3.5-flash → qwen2.5-coder:14b → gemma4:12b → qwen2.5-coder:7b → claude-haiku-5-5<br>
+  <span style="font-size:0.82rem;opacity:0.8;">Duplicates are removed automatically, so if you select claude-haiku-5-5 it won't appear twice.</span>
 </div>
 </section>
 

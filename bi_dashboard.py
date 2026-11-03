@@ -80,7 +80,6 @@ SQL_PASSWORD    = os.getenv("SQL_PASSWORD")
 PG_PASSWORD     = os.getenv("PG_PASSWORD")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY")
-MINIMAX_API_KEY   = os.getenv("MINIMAX_API_KEY")
 
 def get_sql_connection():
     """Helper to get a SQL Server connection for the Vector Engine."""
@@ -488,7 +487,7 @@ def agent_execution(user_question, domain, history_str, model):
     Return JSON ONLY: {format_req}"""
     
     # The cascade list: try models in order. dict.fromkeys() removes duplicates
-    # while preserving order, so if the user already selected "claude-sonnet-4-6"
+    # while preserving order, so if the user already selected "claude-haiku-5-5"
     # it won't appear twice in the list.
     cascade = [model, "gemini-3.5-flash-lite", "gemini-3.5-flash", "qwen2.5-coder:14b", "gemma4:12b", "qwen2.5-coder:7b", "claude-haiku-5-5"]
     models_to_try = list(dict.fromkeys(cascade))
@@ -697,28 +696,34 @@ with st.container(border=True):
             _type = _cfg.get("type", "db").upper()
             future_db_items.append(f"- {_cfg.get('name', _key)} (**{_type}**)")
 
-    # Get active LLM providers
+    # Get active LLM providers and the models each one provides
     active_providers = []
     llm_details = []
 
     if ANTHROPIC_API_KEY:
         active_providers.append("Anthropic")
-        llm_details.append("- **Claude Series LLMs (Opus, Sonnet, Haiku)** (Cloud | Tiered Cost)")
+        llm_details.append("- **Claude Haiku 5.5** (Cloud | Paid, last resort)")
 
     if GEMINI_API_KEY:
         active_providers.append("Google")
-        llm_details.append("- **Gemini Flash Series LLMs** (Cloud | Low Cost)")
+        llm_details.append("- **Gemini 3.5 Flash-Lite / Gemini 3.5 Flash** (Cloud | Free tier)")
 
-    if MINIMAX_API_KEY:
-        active_providers.append("Minimax")
-        llm_details.append("- **Minimax m2.7** (Cloud | Med Cost)")
-
+    # Local models: show only the ones actually installed in Ollama
+    _our_local = {
+        "qwen2.5-coder:14b": "Qwen2.5 Coder 14B",
+        "gemma4:12b": "Gemma 4 12B",
+        "nemotron-3.5-bolt:e4b": "Nemotron 3.5 Bolt E4B",
+        "qwen2.5-coder:7b": "Qwen2.5 Coder 7B",
+        "gemma4:31b-cloud": "Gemma 4 31B (Ollama Cloud)",
+    }
     try:
-        # Check if ollama server is running. If it is, we list the local models from the dropdown.
-        ollama.list() # This will throw an exception if the server is not running.
-        active_providers.append("Ollama (Local)")
-        # This now matches the local models available in the primary model dropdown.
-        llm_details.append("- **Gemma, Qwen Coder, Nemotron** (Local | Open Source | Free)")
+        _installed = set()
+        for _m in ollama.list().get("models", []):
+            _installed.add(_m.get("model") or _m.get("name") or "")
+        _found = [label for name, label in _our_local.items() if name in _installed]
+        if _found:
+            active_providers.append("Ollama (Local)")
+            llm_details.append("- **Ollama:** " + ", ".join(_found) + " (Local | Free)")
     except Exception:
         pass # Ollama not running or installed
 
@@ -765,7 +770,7 @@ with st.sidebar:
         </div>
         <div style="margin-top: 12px;">
             <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 2: Local GPU (Free)</b><br>
-            <span style="font-size: 0.8rem;">• <b>Qwen2.5 Coder 14B</b> / <b>Gemma 4 12B</b> / <b>Qwen2.5 Coder 7B</b></span>
+            <span style="font-size: 0.8rem;">• <b>Qwen2.5 Coder 14B</b> / <b>Gemma 4 12B</b> / <b>Nemotron Bolt E4B</b> / <b>Qwen2.5 Coder 7B</b></span>
         </div>
         <div style="margin-top: 12px;">
             <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 3: Ollama Cloud (Free plan)</b><br>
