@@ -496,6 +496,7 @@ def agent_execution(user_question, domain, history_str, model):
     else:
         _res = dbc.resolve_domain(domain)
         dialect_hint = f"Target database is {_res[1]['type'].upper()}. Use ONLY {_res[1]['type']} SQL syntax and functions." if _res else ""
+        dialect_hint += (" " + dbc.dialect_note(_res[1]['type'])) if _res and dbc.dialect_note(_res[1]['type']) else ""
 
     # UPDATED: Relaxed the Join Key rule so it doesn't break aggregate GROUP BY queries
     system_prompt = f"""Senior Data Architect. Context: {context}

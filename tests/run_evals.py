@@ -45,8 +45,8 @@ def extract_sql(text):
     return sql.strip().rstrip(";").strip()
 
 
-def ask_model(model, schema, question):
-    res = ollama.generate(model=model, system=SYSTEM + schema,
+def ask_model(model, schema, question, dialect=""):
+    res = ollama.generate(model=model, system=SYSTEM + dialect + schema,
                           prompt=question, options={"temperature": 0})
     return extract_sql(res["response"])
 
@@ -94,7 +94,9 @@ def main():
             for q in questions:
                 t0 = time.time()
                 try:
-                    sql = ask_model(model, schema, q["question"])
+                    resolved = dbc.resolve_domain(q["domain"])
+                    dialect = dbc.dialect_note(resolved[1]["type"]) + "\n\n" if resolved else ""
+                    sql = ask_model(model, schema, q["question"], dialect)
                     ok, reason = check(q, sql)
                 except Exception as e:  # model not installed, Ollama down, etc.
                     sql, ok, reason = "", False, f"model error: {e}"

@@ -56,6 +56,15 @@ def get_all_databases() -> Dict[str, Dict]:
 def get_enabled_databases() -> Dict[str, Dict]:
     return {k: v for k, v in get_all_databases().items() if v.get("enabled", False)}
 
+# Extra rules the AI must follow for specific database types (added to its prompt).
+DIALECT_NOTES = {
+    "oracle": "Oracle rule: never write AS before a table alias. Write 'FROM customers c', not 'FROM customers AS c'.",
+}
+
+def dialect_note(db_type: str) -> str:
+    return DIALECT_NOTES.get((db_type or "").lower(), "")
+
+
 def get_domain_map() -> Dict[str, str]:
     """Returns {DOMAIN: db_key} for enabled DBs that have a domain set."""
     return {
