@@ -41,7 +41,8 @@ SYSTEM = (
 def extract_sql(text):
     fenced = re.search(r"```(?:sql)?\s*(.*?)```", text, re.S | re.I)
     sql = fenced.group(1) if fenced else text
-    return sql.strip().rstrip(";") + ";"
+    # Drop the trailing semicolon: Oracle rejects it when the query is wrapped for row limits.
+    return sql.strip().rstrip(";").strip()
 
 
 def ask_model(model, schema, question):
@@ -73,11 +74,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", default=",".join(DEFAULT_MODELS))
     ap.add_argument("--held-out", action="store_true", help="run only held-out questions")
+    ap.add_argument("--only", help="run one question by id, e.g. sales_top_customers")
     args = ap.parse_args()
 
     with open(QUESTIONS_PATH, encoding="utf-8") as f:
         questions = yaml.safe_load(f)
     questions = [q for q in questions if bool(q.get("held_out")) == args.held_out]
+    if args.only:
+        questions = [q for q in questions if q["id"] == args.only]
     schema = dbc.get_schema_for_llm()
     models = [m.strip() for m in args.models.split(",") if m.strip()]
     os.makedirs(os.path.dirname(RESULTS_PATH), exist_ok=True)
