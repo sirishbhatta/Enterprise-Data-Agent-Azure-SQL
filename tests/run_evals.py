@@ -6,9 +6,10 @@ and check the row count and column names. Results are printed as a table and
 appended to logs/eval_results.jsonl.
 
 Usage (from the project folder):
-    python tests/run_evals.py                          # dev questions, default models
+    python tests/run_evals.py --models a,b,c          # all questions, one model after another
     python tests/run_evals.py --models qwen2.5-coder:7b
     python tests/run_evals.py --held-out               # only held-out questions
+    python tests/run_evals.py --dev                    # only development questions
 
 Note: this uses a shorter prompt than the app, so the numbers compare models
 with each other. They are not an exact copy of what the app does.
@@ -23,6 +24,8 @@ from datetime import datetime
 
 import ollama
 import yaml
+
+client = ollama.Client(timeout=300)  # 5 minutes per request, then move on
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
@@ -46,7 +49,7 @@ def extract_sql(text):
 
 
 def ask_model(model, schema, question, dialect=""):
-    res = ollama.generate(model=model, system=SYSTEM + dialect + schema,
+    res = client.generate(model=model, system=SYSTEM + dialect + schema,
                           prompt=question, options={"temperature": 0})
     return extract_sql(res["response"])
 
@@ -74,6 +77,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", default=",".join(DEFAULT_MODELS))
     ap.add_argument("--held-out", action="store_true", help="run only held-out questions")
+    ap.add_argument("--dev", action="store_true", help="run only development questions")
     ap.add_argument("--only", help="run one question by id, e.g. sales_top_customers")
     args = ap.parse_args()
 
@@ -81,8 +85,10 @@ def main():
         questions = yaml.safe_load(f)
     if args.only:  # --only ignores the held-out split so any single question can be rerun
         questions = [q for q in questions if q["id"] == args.only]
-    else:
-        questions = [q for q in questions if bool(q.get("held_out")) == args.held_out]
+    elif args.held_out:
+        questions = [q for q in questions if q.get("held_out")]
+    elif args.dev:
+        questions = [q for q in questions if not q.get("held_out")]
     schema = dbc.get_schema_for_llm()
     models = [m.strip() for m in args.models.split(",") if m.strip()]
     os.makedirs(os.path.dirname(RESULTS_PATH), exist_ok=True)
