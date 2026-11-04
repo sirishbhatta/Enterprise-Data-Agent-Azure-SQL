@@ -1,0 +1,42 @@
+# Starter test set. "held_out: true" questions are checked only after a change is final.
+# expect_min_rows: the answer should return at least this many rows.
+# must_have_columns: column names that should appear in the result.
+- id: hr_hired_after_2024
+  question: Which employees were hired after January 1, 2024?
+  domain: HR
+  expect_min_rows: 1
+  must_have_columns: [name, hire_date]
+- id: hr_avg_salary
+  question: What is the average salary by department?
+  domain: HR
+  expect_min_rows: 2
+  must_have_columns: [department]
+- id: hr_top_earners
+  question: Who are the top 5 highest paid employees?
+  domain: HR
+  expect_min_rows: 5
+  must_have_columns: [name, salary]
+  held_out: true
+- id: claims_total_denied
+  question: What is the total denied claim amount?
+  domain: CLAIMS
+  expect_min_rows: 1
+- id: claims_top_provider
+  question: Which provider has the most approved claims?
+  domain: CLAIMS
+  expect_min_rows: 1
+  held_out: true
+- id: sales_top_customers
+  question: Which 5 customers have the highest total order value?
+  domain: SALES
+  expect_min_rows: 5
+- id: sales_regions
+  question: List all sales regions.
+  domain: SALES
+  expect_min_rows: 1
+  held_out: true
+- id: federated_marketing
+  question: Show me the names and total billed claims of employees in the Marketing department.
+  domain: HR
+  expect_min_rows: 1
+  must_have_columns: [name, total_billed]

@@ -62,6 +62,7 @@ from dotenv import load_dotenv            # Reads secrets from your .env file
 # Allow import of db_connector from parent directory
 sys.path.insert(0, str(Path(__file__).parent))
 import db_connector as dbc
+from query_log import log_query           # Appends each answer to logs/query_log.jsonl
 
 # --- 0. SUPPRESS WARNINGS ---
 # SQLAlchemy warns when pandas uses it in a certain way — we know it's fine, so silence it.
@@ -924,6 +925,7 @@ if final_query:
                 st.error("Couldn't decide which database this question is about, because every routing model failed. Check that Ollama is running and your API keys are set, then try again.")
             
         result = agent_execution(standalone_query, domain, agent_history_str, selected_model) if domain else None
+        log_query(standalone_query, domain, selected_model, result, time.time() - start_time) if domain else None
         
         if result:
             latency = round(time.time() - start_time, 2)

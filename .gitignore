@@ -30,3 +30,6 @@ _backup_*/
 reports_output/
 .vscode/
 *.code-workspace
+
+# Local query log (may contain question text)
+logs/
