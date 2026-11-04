@@ -37,3 +37,50 @@
   held_out: true
 # Cross-database questions (HR + Claims) are not tested here yet: this runner
 # sends each question to one database only.
+
+# --- Added set (uses only columns confirmed in the schema) ---
+- id: hr_count_employees
+  question: How many employees are there?
+  domain: HR
+  expect_min_rows: 1
+- id: hr_departments
+  question: List all departments.
+  domain: HR
+  expect_min_rows: 2
+  held_out: true
+- id: hr_highest_salary
+  question: What is the highest salary in the company?
+  domain: HR
+  expect_min_rows: 1
+- id: hr_hired_2025
+  question: Which employees were hired in 2025?
+  domain: HR
+  expect_min_rows: 1
+  held_out: true
+- id: hr_sales_department
+  question: Show the names and salaries of employees in the Sales department.
+  domain: HR
+  expect_min_rows: 1
+  must_have_columns: [name, salary]
+- id: claims_count
+  question: How many claims are there in total?
+  domain: CLAIMS
+  expect_min_rows: 1
+- id: claims_paid_total
+  question: What is the total paid amount across all claims?
+  domain: CLAIMS
+  expect_min_rows: 1
+- id: claims_top_diagnosis
+  question: What are the 3 most common diagnosis codes?
+  domain: CLAIMS
+  expect_min_rows: 3
+  held_out: true
+- id: sales_customer_count
+  question: How many customers are there?
+  domain: SALES
+  expect_min_rows: 1
+- id: sales_products
+  question: List the first 10 products.
+  domain: SALES
+  expect_min_rows: 10
+  held_out: true
