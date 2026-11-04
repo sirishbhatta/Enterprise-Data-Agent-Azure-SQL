@@ -79,9 +79,10 @@ def main():
 
     with open(QUESTIONS_PATH, encoding="utf-8") as f:
         questions = yaml.safe_load(f)
-    questions = [q for q in questions if bool(q.get("held_out")) == args.held_out]
-    if args.only:
+    if args.only:  # --only ignores the held-out split so any single question can be rerun
         questions = [q for q in questions if q["id"] == args.only]
+    else:
+        questions = [q for q in questions if bool(q.get("held_out")) == args.held_out]
     schema = dbc.get_schema_for_llm()
     models = [m.strip() for m in args.models.split(",") if m.strip()]
     os.makedirs(os.path.dirname(RESULTS_PATH), exist_ok=True)
