@@ -766,10 +766,14 @@ with st.container(border=True):
 with st.sidebar:
     # Model choice first: the one setting most people will touch
     st.markdown("**Model**")
-    selected_model = st.selectbox("Primary model", [
+    _model_options = [
         "gemini-3.5-flash-lite", "gemini-3.5-flash", "claude-haiku-5-5",
         "qwen2.5-coder:14b", "gemma4:12b", "nemotron-3.5-bolt:e4b", "qwen2.5-coder:7b", "gemma4:31b-cloud"
-    ], format_func=format_model_label, help="Tried first. If it fails, the app moves down the list automatically.")
+    ]
+    # Default is the local model that passed every test in tests/run_evals.py
+    selected_model = st.selectbox("Primary model", _model_options,
+        index=_model_options.index("qwen2.5-coder:7b"),
+        format_func=format_model_label, help="Tried first. If it fails, the app moves down the list automatically.")
 
     with st.expander("Model tiers and costs"):
         st.markdown("""
