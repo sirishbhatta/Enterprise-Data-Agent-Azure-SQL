@@ -27,6 +27,7 @@ databases:
     port: 1521
     service_name: XEPDB1
     username: BI_READER
+    schema: BI_SALES
     password_env: ORACLE_PASSWORD
     domain: SALES
     enabled: true

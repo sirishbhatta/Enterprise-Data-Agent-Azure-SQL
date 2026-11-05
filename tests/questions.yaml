@@ -496,7 +496,7 @@
   expect_min_rows: 1
   held_out: false
 - id: sales_100
-  question: What is the total order value for customers with more than 5 orders?
+  question: What is the total order value for customers with more than 1 order?
   domain: SALES
   expect_min_rows: 1
   held_out: true

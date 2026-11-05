@@ -89,7 +89,7 @@ add("CLAIMS", "Which provider has the highest paid amount overall?")
 add("SALES", "How many customers have no orders?")
 add("SALES", "Which customer has the single largest order?")
 add("SALES", "How many customers have placed at least one order?")
-add("SALES", "What is the total order value for customers with more than 5 orders?")
+add("SALES", "What is the total order value for customers with more than 1 order?")
 
 assert len(Q) == 100, f"expected 100, got {len(Q)}"
 
