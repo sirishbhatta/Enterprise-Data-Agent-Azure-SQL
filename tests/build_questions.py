@@ -24,11 +24,12 @@ for dept_agg in ["What is the average salary by department?",
 for y in range(2019, 2026):
     add("HR", f"Which employees were hired after January 1, {y}?")
     add("HR", f"How many employees were hired in {y}?")
-for s in [80000, 100000, 120000, 140000, 160000]:
+for s in [80000, 100000, 120000, 140000]:
     add("HR", f"Which employees earn more than {s}?")
 for n in [3, 5, 10]:
     add("HR", f"Who are the top {n} highest paid employees?")
 add("HR", "How many employees are there?")
+add("HR", "What is the highest salary across all employees?")
 add("HR", "What is the average salary across all employees?")
 add("HR", "List all departments.")
 add("HR", "What is the most recent hire date?")

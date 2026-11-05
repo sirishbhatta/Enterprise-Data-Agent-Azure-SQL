@@ -772,7 +772,7 @@ with st.sidebar:
     ]
     # Default is the local model that passed every test in tests/run_evals.py
     selected_model = st.selectbox("Primary model", _model_options,
-        index=_model_options.index("qwen2.5-coder:7b"),
+        index=_model_options.index("qwen2.5-coder:14b"),
         format_func=format_model_label, help="Tried first. If it fails, the app moves down the list automatically.")
 
     with st.expander("Model tiers and costs"):

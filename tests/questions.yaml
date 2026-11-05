@@ -121,27 +121,27 @@
   expect_min_rows: 1
   held_out: true
 - id: hr_025
-  question: Which employees earn more than 160000?
-  domain: HR
-  expect_min_rows: 1
-  held_out: false
-- id: hr_026
   question: Who are the top 3 highest paid employees?
   domain: HR
   expect_min_rows: 1
   held_out: false
-- id: hr_027
+- id: hr_026
   question: Who are the top 5 highest paid employees?
   domain: HR
   expect_min_rows: 1
   held_out: false
-- id: hr_028
+- id: hr_027
   question: Who are the top 10 highest paid employees?
+  domain: HR
+  expect_min_rows: 1
+  held_out: false
+- id: hr_028
+  question: How many employees are there?
   domain: HR
   expect_min_rows: 1
   held_out: true
 - id: hr_029
-  question: How many employees are there?
+  question: What is the highest salary across all employees?
   domain: HR
   expect_min_rows: 1
   held_out: false
