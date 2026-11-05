@@ -37,7 +37,7 @@ RESULTS_PATH = os.path.join(ROOT, "logs", "eval_results.jsonl")
 
 SYSTEM = (
     "You write one SQL SELECT statement for the database described below. "
-    "Use only the tables and columns listed. Output only the SQL, with no explanation.\n\n"
+    "Use only the tables and columns listed, copied exactly as written (same spelling, underscores, and capitalization). Never invent or shorten a name. Output only the SQL, with no explanation.\n\n"
 )
 
 

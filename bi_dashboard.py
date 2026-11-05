@@ -503,7 +503,7 @@ def agent_execution(user_question, domain, history_str, model):
     1. Join key is emp_id (INT) and MemberID (VARCHAR). MemberID MUST be in quotes.
     2. FEDERATED requires BOTH queries. NO CROSS-DATABASE JOINS.
     3. FOR FEDERATED QUERIES ONLY: Include join keys in SELECT clauses. Do NOT force join keys into standard HR or CLAIMS aggregate queries!
-    4. Flat strings for SQL.
+    4. Flat strings for SQL. Copy table and column names exactly as listed in the schema.
     5. {dialect_hint}{memory_hint}
     Return JSON ONLY: {format_req}"""
     
