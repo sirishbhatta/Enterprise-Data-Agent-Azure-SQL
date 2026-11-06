@@ -320,19 +320,35 @@ def discover_schema(db_key: str, db_config: Dict) -> Dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def load_schema_cache() -> Dict:
-    if SCHEMA_CACHE_PATH.exists():
+    """Load the cache. A corrupt file is moved aside and treated as empty."""
+    if not SCHEMA_CACHE_PATH.exists():
+        return {}
+    try:
         with open(SCHEMA_CACHE_PATH, encoding="utf-8") as f:
             return json.load(f)
-    return {}
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        bad = SCHEMA_CACHE_PATH.with_suffix(".corrupt.json")
+        os.replace(SCHEMA_CACHE_PATH, bad)
+        print(f"[schema cache] unreadable, moved to {bad.name}: {e}")
+        return {}
 
 def save_schema_cache(cache: Dict):
-    with open(SCHEMA_CACHE_PATH, "w", encoding="utf-8") as f:
+    """Write to a temp file first, then swap it in, so a crash never leaves half a file."""
+    tmp = SCHEMA_CACHE_PATH.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2, default=str)
+    os.replace(tmp, SCHEMA_CACHE_PATH)
 
 def refresh_schema(db_key: str, db_config: Dict) -> Dict:
-    """Discover and cache schema for a single database. Returns the schema."""
+    """
+    Discover and cache schema for a single database. Returns the schema.
+    A failed scrape is returned but never saved, so the last good section stays in place.
+    """
     schema = discover_schema(db_key, db_config)
-    cache  = load_schema_cache()
+    if schema.get("error"):
+        print(f"[schema cache] {db_key} scrape failed, keeping previous cache: {schema['error']}")
+        return schema
+    cache = load_schema_cache()
     cache[db_key] = schema
     save_schema_cache(cache)
     return schema
