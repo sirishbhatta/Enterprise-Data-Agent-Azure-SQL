@@ -18,7 +18,7 @@
 ║                              If found (≥65% match), give the AI a hint.      ║
 ║       │                                                                      ║
 ║       ▼                                                                      ║
-║  [3] supervisor_routing() — Ask the AI: which database does this belong to?  ║
+║  [3] domain_router() — Ask the AI: which database does this belong to?       ║
 ║                              Returns: HR, CLAIMS, SALES, or FEDERATED        ║
 ║       │                                                                      ║
 ║       ▼                                                                      ║
@@ -136,7 +136,7 @@ def save_vector_memory(query, sql, domain, agent, is_positive):
     except Exception as e:
         print(f"Failed to save vector memory: {e}")
 
-def check_vector_memory(user_question, threshold=65.0):
+def check_vector_memory(user_question, threshold=90.0):
     """Searches SQL Server 2025 using VECTOR_DISTANCE for a semantic match."""
     try:
         vector_data = ollama.embeddings(model="nomic-embed-text", prompt=user_question)["embedding"]
@@ -233,7 +233,7 @@ _SCHEMA_FALLBACK = (
 )
 ACTIVE_SCHEMA = _dynamic_schema if "Table" in _dynamic_schema else _SCHEMA_FALLBACK
 
-# Build domain list dynamically from the registry for the routing supervisor
+# Build domain list dynamically from the registry for the routing domain router
 DOMAIN_MAP = dbc.get_domain_map()          # e.g. {"HR": "hr", "CLAIMS": "claims"}
 ACTIVE_DOMAINS = list(DOMAIN_MAP.keys())   # e.g. ["HR", "CLAIMS"]
 
@@ -329,11 +329,11 @@ def get_db_data(query: str, domain: str):
 
 # --- 6. AGENT WORKFLOW ---
 # These three functions form the "brain pipeline":
-#   rewrite_query → supervisor_routing → agent_execution
+#   rewrite_query → domain_router → agent_execution
 #
 # Think of it like a team:
 #   rewrite_query   = Translator  (makes sure the question is clear)
-#   supervisor      = Manager     (decides which expert to send it to)
+#   domain_router   = Dispatcher  (decides which database expert to send it to)
 #   agent_execution = Worker      (writes the SQL and runs it)
 
 def rewrite_query(current_question, history_list, model):
@@ -343,6 +343,12 @@ def rewrite_query(current_question, history_list, model):
     This prevents the AI from losing context when generating SQL.
     """
     if not history_list: return current_question
+
+    # Only rewrite real follow-ups. A self-contained question must not pick up
+    # context from earlier turns (that is how an old averages question leaked in).
+    followup_cues = r"\b(it|its|they|them|their|those|these|that|this|same|also|another|other|more|again|too|previous|above|instead|what about|how about)\b"
+    if not re.search(followup_cues, current_question, re.IGNORECASE):
+        return current_question
 
     system_prompt = """You are an AI query translator. Look at the conversation history and the user's latest question.
     1. If the latest question is a follow-up, rewrite it into a single, comprehensive, standalone sentence containing all necessary context from the history.
@@ -355,8 +361,19 @@ def rewrite_query(current_question, history_list, model):
     if '"error":' in rewritten: return current_question
     return rewritten.strip('"').strip()
 
-def supervisor_routing(user_question, history_str, model):
-    memory, _ = check_vector_memory(user_question)
+def _plain_routing_reason(domain, memory, memory_score):
+    """One plain-English sentence explaining why a database was picked."""
+    if memory:
+        return (f"A similar question you saved earlier ({memory_score:.0f}% match) was used as a hint, "
+                f"so it was sent to the {domain} database.")
+    if domain == "FEDERATED":
+        return "This question needs data from more than one database, so it was split into one query per database."
+    desc = dbc.get_enabled_databases().get(DOMAIN_MAP.get(domain, ""), {}).get("description", domain)
+    return f"This question is about {desc}, so it was sent to the {domain} database."
+
+def domain_router(user_question, history_str, model):
+    """Returns (domain, plain_reason). domain is None if every routing model failed."""
+    memory, memory_score = check_vector_memory(user_question)
     memory_hint = f"\n\n[HINT]: A past similar question ('{memory['query']}') was routed correctly." if memory else ""
 
     # Build domain routing rules dynamically from the registry
@@ -366,7 +383,7 @@ def supervisor_routing(user_question, history_str, model):
     )
     valid_outputs = "', '".join(ACTIVE_DOMAINS) + "', or 'FEDERATED'"
 
-    system = f"""You are a Routing Supervisor. Output ONLY one of: '{valid_outputs}'.
+    system = f"""You are a Domain Router. Pick the one database this question belongs to. Output ONLY one of: '{valid_outputs}'.
     Routing rules:
 {domain_rules}
     - FEDERATED: ONLY if the question explicitly requires joining data from TWO OR MORE of the above databases.
@@ -374,23 +391,24 @@ def supervisor_routing(user_question, history_str, model):
 
     # Try the selected model, then free fallbacks, until one gives a valid answer.
     # Match whole words only -- "HR" used to match inside words like "THROUGH".
-    for router in dict.fromkeys([model, "gemini-3.5-flash-lite", "qwen2.5-coder:7b"]):
+    for router in dict.fromkeys([model, "qwen2.5-coder:7b", "gemini-3.5-flash-lite"]):
         raw = generate_ai_response(router, system, f"History: {history_str}\nQuestion: {user_question}")
         if '"error":' in raw:
             continue
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).upper()
         if re.search(r"\bFEDERATED\b", raw):
-            return "FEDERATED"
+            return "FEDERATED", _plain_routing_reason("FEDERATED", memory, memory_score)
         found = [d for d in ACTIVE_DOMAINS if re.search(rf"\b{re.escape(d)}\b", raw)]
         if len(found) == 1:
-            return found[0]
+            return found[0], _plain_routing_reason(found[0], memory, memory_score)
     # Every routing model failed: say so instead of guessing a database.
-    return None
+    return None, ""
 
-# Analysis model order: free local first, then free cloud, paid last.
+# Model order by cost, cheapest first: free local, free Ollama Cloud, then paid
+# Gemini (cheap), then paid Claude last.
 ANALYSIS_MODELS = [
-    "gemma4:12b",
     "qwen2.5-coder:14b",
+    "gemma4:12b",
     "nemotron-3.5-bolt:e4b",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
@@ -510,7 +528,7 @@ def agent_execution(user_question, domain, history_str, model):
     # The cascade list: try models in order. dict.fromkeys() removes duplicates
     # while preserving order, so if the user already selected "claude-haiku-5-5"
     # it won't appear twice in the list.
-    cascade = [model, "gemini-3.5-flash-lite", "gemini-3.5-flash", "qwen2.5-coder:14b", "gemma4:12b", "qwen2.5-coder:7b", "claude-haiku-5-5"]
+    cascade = [model, "qwen2.5-coder:14b", "gemma4:12b", "qwen2.5-coder:7b", "gemini-3.5-flash-lite", "gemini-3.5-flash", "claude-haiku-5-5"]
     models_to_try = list(dict.fromkeys(cascade))
     escalation_log = []   # Track which models were tried and why they failed
 
@@ -727,7 +745,7 @@ with st.container(border=True):
 
     if GEMINI_API_KEY:
         active_providers.append("Google")
-        llm_details.append("- **Gemini 3.5 Flash-Lite / Gemini 3.5 Flash** (Cloud | Free tier)")
+        llm_details.append("- **Gemini 3.5 Flash-Lite / Gemini 3.5 Flash** (Cloud | Paid, cheap)")
 
     # Local models: show only the ones actually installed in Ollama
     _our_local = {
@@ -766,9 +784,10 @@ with st.container(border=True):
 with st.sidebar:
     # Model choice first: the one setting most people will touch
     st.markdown("**Model**")
+    # Ordered by cost, cheapest first
     _model_options = [
+        "qwen2.5-coder:14b", "gemma4:12b", "nemotron-3.5-bolt:e4b", "qwen2.5-coder:7b", "gemma4:31b-cloud",
         "gemini-3.5-flash-lite", "gemini-3.5-flash", "claude-haiku-5-5",
-        "qwen2.5-coder:14b", "gemma4:12b", "nemotron-3.5-bolt:e4b", "qwen2.5-coder:7b", "gemma4:31b-cloud"
     ]
     # Default is the local model that passed every test in tests/run_evals.py
     selected_model = st.selectbox("Primary model", _model_options,
@@ -778,19 +797,19 @@ with st.sidebar:
     with st.expander("Model tiers and costs"):
         st.markdown("""
         <div style="margin-top: 10px;">
-            <b><span class="material-symbols-rounded mat-icon" style="color: #d97706;">military_tech</span> Tier 1: Free Cloud</b><br>
-            <span style="font-size: 0.8rem;">• <b>Gemini 3.5 Flash-Lite</b> / <b>Gemini 3.5 Flash</b></span>
-        </div>
-        <div style="margin-top: 12px;">
-            <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 2: Local GPU (Free)</b><br>
+            <b><span class="material-symbols-rounded mat-icon" style="color: #8b5cf6;">cloud_sync</span> Tier 1: Local GPU (Free)</b><br>
             <span style="font-size: 0.8rem;">• <b>Qwen2.5 Coder 14B</b> / <b>Gemma 4 12B</b> / <b>Nemotron Bolt E4B</b> / <b>Qwen2.5 Coder 7B</b></span>
         </div>
         <div style="margin-top: 12px;">
-            <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 3: Ollama Cloud (Free plan)</b><br>
+            <b><span class="material-symbols-rounded mat-icon" style="color: #2563eb;">speed</span> Tier 2: Ollama Cloud (Free plan)</b><br>
             <span style="font-size: 0.8rem;">• <b>Gemma 4 31B Cloud</b></span>
         </div>
         <div style="margin-top: 12px;">
-            <b><span class="material-symbols-rounded mat-icon" style="color: #16a34a;">dns</span> Tier 4: Paid Backup (cheap)</b><br>
+            <b><span class="material-symbols-rounded mat-icon" style="color: #d97706;">military_tech</span> Tier 3: Gemini (paid, cheap)</b><br>
+            <span style="font-size: 0.8rem;">• <b>Gemini 3.5 Flash-Lite</b> / <b>Gemini 3.5 Flash</b></span>
+        </div>
+        <div style="margin-top: 12px;">
+            <b><span class="material-symbols-rounded mat-icon" style="color: #16a34a;">dns</span> Tier 4: Claude (paid, last resort)</b><br>
             <span style="font-size: 0.8rem;">• <b>Claude Haiku 5.5</b></span>
         </div>
         """, unsafe_allow_html=True)
@@ -830,10 +849,19 @@ with chat_box:
                 c2.metric("🤖 Answered by", friendly_model_name(msg['metadata']['agent']))
             
                 with st.expander("🔍 How this was answered"):
-                    st.write(f"**Strategy:** {msg['metadata'].get('reasoning', 'N/A')}")
+                    md = msg["metadata"]
+                    st.markdown(f"**1. Database chosen:** {md.get('routing_reason') or 'Picked by the router (no reason recorded for older answers).'}")
+                    if md.get("memory_used"):
+                        st.markdown(f"**2. Saved example used:** Yes. A similar question you saved earlier ({md.get('memory_ratio', 0):.0f}% match) was used as a starting point for the SQL.")
+                    else:
+                        st.markdown("**2. Saved example used:** No. No saved example was close enough, so the SQL was written fresh from the database layout.")
+                    st.markdown(f"**3. Strategy:** {md.get('reasoning', 'N/A')}")
+                    st.markdown("**4. SQL that ran:**")
                     st.code(sqlparse.format(msg['metadata']['sql'], reindent=True, keyword_case='upper'), language="sql")
-                    for fail in msg['metadata'].get('escalation_log', []):
-                        st.error(f"**{fail['model']}** failed: {str(fail['error'])[:800]}")
+                    if msg['metadata'].get('escalation_log'):
+                        st.markdown("**5. Models that failed before this answer:**")
+                        for fail in msg['metadata'].get('escalation_log', []):
+                            st.error(f"**{fail['model']}** failed: {str(fail['error'])[:800]}")
         
             st.markdown(msg["content"].replace('$', '\\$'))
             if "data" in msg and not msg["data"].empty:
@@ -876,19 +904,24 @@ with chat_box:
                             st.error("Analysis failed: every analysis model was unavailable.")
 
             if msg["role"] == "assistant" and "metadata" in msg:
-                feedback_key = f"fb_{i}"
+                st.markdown("#### Was this answer right?")
                 st.caption("👍 saves this question and its SQL as an example for future answers. 👎 is not saved.")
-                feedback = st.feedback("thumbs", key=feedback_key)
-            
-                if feedback is not None and not msg.get("feedback_saved"):
-                    is_positive = (feedback == 1)
-                    clean_query = msg["metadata"].get("standalone_query", st.session_state.messages[i-1]["content"])
-                
-                    save_vector_memory(clean_query, msg["metadata"]["sql"], msg["metadata"]["domain"], msg["metadata"]["agent"], is_positive)
-                    msg["feedback_saved"] = True
-                    if is_positive: st.toast("Embedded and saved to SQL Server Vector Engine! 🧠", icon="✅")
-                    time.sleep(0.5) 
-                    st.rerun()
+                fb_state = msg.get("feedback")
+                if fb_state is None:
+                    b_up, b_down, _ = st.columns([2, 2, 4])
+                    if b_up.button("👍 Yes, save as example", key=f"up_{i}", type="primary"):
+                        clean_query = msg["metadata"].get("standalone_query", st.session_state.messages[i-1]["content"])
+                        save_vector_memory(clean_query, msg["metadata"]["sql"], msg["metadata"]["domain"], msg["metadata"]["agent"], True)
+                        msg["feedback"] = "up"
+                        msg["feedback_saved"] = True
+                        st.rerun()
+                    if b_down.button("👎 No, don't save", key=f"down_{i}"):
+                        msg["feedback"] = "down"
+                        st.rerun()
+                elif fb_state == "up":
+                    st.success("👍 Saved as an example for future answers.")
+                else:
+                    st.warning("👎 Not saved.")
 
         if msg["role"] == "assistant":
             st.markdown("<div style='margin: 40px 0; border-bottom: 3px dashed #cbd5e1;'></div>", unsafe_allow_html=True)
@@ -922,10 +955,10 @@ if final_query:
     with st.chat_message("assistant", avatar="✨"):
         start_time = time.time()
         
-        with st.spinner("Supervisor analyzing intent..."):
-            domain = supervisor_routing(standalone_query, agent_history_str, selected_model)
+        with st.spinner("Routing question to a database..."):
+            domain, routing_reason = domain_router(standalone_query, agent_history_str, selected_model)
             if domain:
-                st.write(f"🔀 Supervisor routed to **{domain}**")
+                st.write(f"🔀 Domain router sent this to **{domain}**. {routing_reason}")
             else:
                 st.error("Couldn't decide which database this question is about, because every routing model failed. Check that Ollama is running and your API keys are set, then try again.")
             
@@ -982,6 +1015,7 @@ if final_query:
                     "sql":              result['sql'],
                     "reasoning":        result['reasoning'],
                     "domain":           domain,
+                    "routing_reason":   routing_reason,
                     "memory_used":      memory_used,
                     "memory_ratio":     memory_ratio,
                     "standalone_query": standalone_query,

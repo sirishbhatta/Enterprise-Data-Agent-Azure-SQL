@@ -10,7 +10,7 @@ I built this to see how far a BI workflow I know well (SQL, dimensional data, he
 
 ## What it does
 
-- **Routes each question to the right database.** A "supervisor" model reads the question and picks HR (PostgreSQL), Claims (SQL Server) or Sales (Oracle). Questions that need two databases are split into one query per database and joined in Python.
+- **Routes each question to the right database.** A "domain router" model reads the question and picks HR (PostgreSQL), Claims (SQL Server) or Sales (Oracle). Questions that need two databases are split into one query per database and joined in Python.
 - **Writes SQL in the right dialect.** The model is told which database it's writing for. As a safety net, row limits are translated automatically (`LIMIT` ↔ `TOP` ↔ `FETCH FIRST`) because models mix these up often.
 - **Fixes its own SQL.** If a query fails, the model is shown the database error and gets one try to correct it before the app moves on to the next model.
 - **Falls back across models.** Free models are tried first. A paid model is only used if everything else fails.
@@ -56,7 +56,7 @@ Model names change often. If one is retired, its error shows up under **View SQL
 ```
 Question
   → check memory for a similar past question (vector search in SQL Server)
-  → supervisor picks the database (HR / CLAIMS / SALES / FEDERATED)
+  → domain router picks the database (HR / CLAIMS / SALES / FEDERATED)
   → model writes SQL for that database's dialect
   → safety checks: read-only, dialect fix, 500-row cap
   → run it

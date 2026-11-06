@@ -299,8 +299,8 @@ footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; 
     <div class="fname">bi_dashboard.py</div>
     <span class="chip chip-red">Core AI Logic</span>
     <h3>The AI Brain</h3>
-    <p>The largest and most complex file. Contains the entire agent pipeline: vector memory search, query rewriting, AI routing supervisor, multi-model SQL generation with automatic fallback, federated query merging, result display, and thumbs-up feedback loop.</p>
-    <p><strong>Functions:</strong> <code>rewrite_query()</code> → <code>supervisor_routing()</code> → <code>agent_execution()</code></p>
+    <p>The largest and most complex file. Contains the entire agent pipeline: vector memory search, query rewriting, AI routing domain router, multi-model SQL generation with automatic fallback, federated query merging, result display, and thumbs-up feedback loop.</p>
+    <p><strong>Functions:</strong> <code>rewrite_query()</code> → <code>domain_router()</code> → <code>agent_execution()</code></p>
   </div>
 
   <div class="file-card">
@@ -404,7 +404,7 @@ footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; 
   <div class="arr">›</div>
   <div class="fs">
     <div class="num">4</div>
-    <div class="label">supervisor_routing()</div>
+    <div class="label">domain_router()</div>
     <div class="sub">AI reads the question and picks a domain</div>
     <div class="ex">Returns "HR"</div>
   </div>
@@ -493,7 +493,7 @@ footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; 
   <div class="arr">›</div>
   <div class="fs">
     <div class="num">4</div>
-    <div class="label">supervisor_routing()</div>
+    <div class="label">domain_router()</div>
     <div class="sub">Also receives memory hint to help with routing accuracy</div>
     <div class="ex">Routes to CLAIMS</div>
   </div>
@@ -563,7 +563,7 @@ footer { text-align: center; padding: 32px; color: #9aa0a6; font-size: 0.82rem; 
 <div class="flow-steps">
   <div class="fs">
     <div class="num">1</div>
-    <div class="label">supervisor_routing()</div>
+    <div class="label">domain_router()</div>
     <div class="sub">AI recognises the question needs data from two different databases</div>
     <div class="ex">Returns "FEDERATED"</div>
   </div>
@@ -717,7 +717,7 @@ search_query = <span class="s">"""
   <tbody>
     <tr><td>Save</td><td><code>save_vector_memory()</code></td><td>Converts question → 768 numbers via nomic-embed-text (Ollama on your GPU). Stores in SQL Server. Only triggers on 👍 feedback.</td><td>Only if &lt;95% match already exists (deduplication)</td></tr>
     <tr><td>Search</td><td><code>check_vector_memory()</code></td><td>Converts new question → 768 numbers. Runs VECTOR_DISTANCE query in SQL Server. Returns closest match.</td><td>Returns a hint only if similarity ≥ 65%</td></tr>
-    <tr><td>Use hint</td><td><code>supervisor_routing()</code></td><td>Injects memory hint into routing prompt to improve domain detection</td><td>Any match found</td></tr>
+    <tr><td>Use hint</td><td><code>domain_router()</code></td><td>Injects memory hint into routing prompt to improve domain detection</td><td>Any match found</td></tr>
     <tr><td>Use hint</td><td><code>agent_execution()</code></td><td>Injects past SQL as "CRITICAL OVERRIDE" into the SQL generation prompt</td><td>≥65% match only</td></tr>
   </tbody>
 </table>

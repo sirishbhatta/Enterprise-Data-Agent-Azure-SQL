@@ -213,14 +213,14 @@ slide2.addText('→', {
   fontSize: 20, color: colors.navy, align: 'center'
 });
 
-// Supervisor box
+// Domain Router box
 slide2.addShape(prs.ShapeType.roundRect, {
   x: 5.7, y: 1.1, w: 2, h: 0.6,
   fill: { color: colors.charcoal },
   line: { type: 'none' }
 });
 
-slide2.addText('Supervisor AI', {
+slide2.addText('Domain Router', {
   x: 5.7, y: 1.1, w: 2, h: 0.6,
   fontSize: 12, bold: true,
   color: colors.white,
