@@ -24,6 +24,7 @@ from datetime import datetime
 
 import ollama
 import yaml
+from reference_sql import REFERENCE
 
 client = ollama.Client(timeout=300)  # 5 minutes per request, then move on
 
@@ -70,6 +71,40 @@ def check(q, sql):
     missing = [c for c in q.get("must_have_columns", []) if c.lower() not in cols]
     if missing:
         return False, f"missing columns: {', '.join(missing)}"
+    ref = REFERENCE.get(q["question"])
+    if ref:
+        ok, reason = check_against_reference(df, ref)
+        if not ok:
+            return False, reason
+    return True, "ok"
+
+
+def _values(df):
+    """Every cell as a rounded number or a stripped string, so types and column names don't matter."""
+    out = []
+    for row in df.itertuples(index=False):
+        for v in row:
+            try:
+                out.append(round(float(v), 2))
+            except (TypeError, ValueError):
+                out.append(str(v).strip())
+    return out
+
+
+def check_against_reference(df, ref):
+    """Every value in the reference result must appear in the model's result."""
+    ref_domain, ref_sql = ref
+    resolved = dbc.resolve_domain(ref_domain)
+    if not resolved:
+        return False, f"reference: no database for {ref_domain}"
+    db_key, cfg = resolved
+    ref_res = dbc.execute_query(db_key, cfg, ref_sql)
+    if not ref_res.get("success"):
+        return False, "reference SQL error: " + str(ref_res.get("error", ""))[:120]
+    model_vals = _values(df)
+    missing = [v for v in _values(ref_res["data"]) if v not in model_vals]
+    if missing:
+        return False, f"values differ from reference (missing {missing[:3]})"
     return True, "ok"
 
 
