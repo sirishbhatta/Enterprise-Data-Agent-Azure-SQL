@@ -2,14 +2,16 @@
 Test local models on tests/questions.yaml.
 
 For each model and question: ask the model for SQL from the schema, run it,
-and check the row count and column names. Results are printed as a table and
-appended to logs/eval_results.jsonl.
+check the row count and column names, and compare values to a reference query
+when one exists. Results are printed as a table and appended to
+logs/eval_results.jsonl.
 
 Usage (from the project folder):
     python tests/run_evals.py --models a,b,c          # all questions, one model after another
     python tests/run_evals.py --models qwen2.5-coder:7b
     python tests/run_evals.py --held-out               # only held-out questions
     python tests/run_evals.py --dev                    # only development questions
+    python tests/run_evals.py --only hr_001            # one question by id
 
 Note: this uses a shorter prompt than the app, so the numbers compare models
 with each other. They are not an exact copy of what the app does.
@@ -42,6 +44,10 @@ SYSTEM = (
 )
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Asking the model
+# ─────────────────────────────────────────────────────────────────────────────
+
 def extract_sql(text):
     fenced = re.search(r"```(?:sql)?\s*(.*?)```", text, re.S | re.I)
     sql = fenced.group(1) if fenced else text
@@ -55,28 +61,19 @@ def ask_model(model, schema, question, dialect=""):
     return extract_sql(res["response"])
 
 
-def check(q, sql):
-    """Return (passed, reason)."""
-    resolved = dbc.resolve_domain(q["domain"])
-    if not resolved:
-        return False, f"no database for domain {q['domain']}"
-    db_key, cfg = resolved
-    result = dbc.execute_query(db_key, cfg, sql)
-    if not result.get("success"):
-        return False, "SQL error: " + str(result.get("error", ""))[:150]
-    df = result["data"]
+# ─────────────────────────────────────────────────────────────────────────────
+# Checking the answer
+# ─────────────────────────────────────────────────────────────────────────────
+
+def check_shape(q, df):
+    """Row count and column checks. Returns a failure reason, or None if the shape is fine."""
     if len(df) < q.get("expect_min_rows", 0):
-        return False, f"{len(df)} rows, expected at least {q['expect_min_rows']}"
+        return f"{len(df)} rows, expected at least {q['expect_min_rows']}"
     cols = {c.lower() for c in df.columns}
     missing = [c for c in q.get("must_have_columns", []) if c.lower() not in cols]
     if missing:
-        return False, f"missing columns: {', '.join(missing)}"
-    ref = REFERENCE.get(q["question"])
-    if ref:
-        ok, reason = check_against_reference(df, ref)
-        if not ok:
-            return False, reason
-    return True, "ok"
+        return f"missing columns: {', '.join(missing)}"
+    return None
 
 
 def _values(df):
@@ -108,22 +105,82 @@ def check_against_reference(df, ref):
     return True, "ok"
 
 
-def main():
+def check(q, sql):
+    """Run the model's SQL and return (passed, reason)."""
+    resolved = dbc.resolve_domain(q["domain"])
+    if not resolved:
+        return False, f"no database for domain {q['domain']}"
+    db_key, cfg = resolved
+    result = dbc.execute_query(db_key, cfg, sql)
+    if not result.get("success"):
+        return False, "SQL error: " + str(result.get("error", ""))[:150]
+    df = result["data"]
+    reason = check_shape(q, df)
+    if reason:
+        return False, reason
+    ref = REFERENCE.get(q["question"])
+    if ref:
+        ok, reason = check_against_reference(df, ref)
+        if not ok:
+            return False, reason
+    return True, "ok"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Running the eval
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_args(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", default=",".join(DEFAULT_MODELS))
     ap.add_argument("--held-out", action="store_true", help="run only held-out questions")
     ap.add_argument("--dev", action="store_true", help="run only development questions")
     ap.add_argument("--only", help="run one question by id, e.g. sales_top_customers")
-    args = ap.parse_args()
+    return ap.parse_args(argv)
 
+
+def select_questions(questions, args):
+    """--only ignores the held-out split so any single question can be rerun."""
+    if args.only:
+        return [q for q in questions if q["id"] == args.only]
+    if args.held_out:
+        return [q for q in questions if q.get("held_out")]
+    if args.dev:
+        return [q for q in questions if not q.get("held_out")]
+    return questions
+
+
+def run_one(model, q, schema):
+    """Ask the model and check its answer. Returns (sql, ok, reason, seconds)."""
+    t0 = time.time()
+    try:
+        resolved = dbc.resolve_domain(q["domain"])
+        dialect = dbc.dialect_note(resolved[1]["type"]) + "\n\n" if resolved else ""
+        sql = ask_model(model, schema, q["question"], dialect)
+        ok, reason = check(q, sql)
+    except Exception as e:  # model not installed, Ollama down, etc.
+        sql, ok, reason = "", False, f"model error: {e}"
+    return sql, ok, reason, time.time() - t0
+
+
+def log_result(log, model, q, sql, ok, reason, elapsed):
+    log.write(json.dumps({
+        "ts": datetime.now().isoformat(timespec="seconds"), "model": model,
+        "id": q["id"], "held_out": bool(q.get("held_out")), "ok": ok,
+        "reason": reason, "sql": sql, "seconds": round(elapsed, 2),
+    }) + "\n")
+
+
+def print_summary(summary):
+    print("\nSUMMARY")
+    for model, (p, n, avg) in summary.items():
+        print(f"  {model:<22} {p}/{n} passed   avg {avg:.1f}s per question")
+
+
+def main(argv=None):
+    args = parse_args(argv)
     with open(QUESTIONS_PATH, encoding="utf-8") as f:
-        questions = yaml.safe_load(f)
-    if args.only:  # --only ignores the held-out split so any single question can be rerun
-        questions = [q for q in questions if q["id"] == args.only]
-    elif args.held_out:
-        questions = [q for q in questions if q.get("held_out")]
-    elif args.dev:
-        questions = [q for q in questions if not q.get("held_out")]
+        questions = select_questions(yaml.safe_load(f), args)
     schema = dbc.get_schema_for_llm()
     models = [m.strip() for m in args.models.split(",") if m.strip()]
     os.makedirs(os.path.dirname(RESULTS_PATH), exist_ok=True)
@@ -134,28 +191,14 @@ def main():
             passed, secs = 0, 0.0
             print(f"\n== {model} ==")
             for q in questions:
-                t0 = time.time()
-                try:
-                    resolved = dbc.resolve_domain(q["domain"])
-                    dialect = dbc.dialect_note(resolved[1]["type"]) + "\n\n" if resolved else ""
-                    sql = ask_model(model, schema, q["question"], dialect)
-                    ok, reason = check(q, sql)
-                except Exception as e:  # model not installed, Ollama down, etc.
-                    sql, ok, reason = "", False, f"model error: {e}"
-                elapsed = time.time() - t0
+                sql, ok, reason, elapsed = run_one(model, q, schema)
                 secs += elapsed
                 passed += ok
                 print(f"  {'PASS' if ok else 'FAIL'}  {q['id']:<24} {elapsed:5.1f}s  {reason}")
-                log.write(json.dumps({
-                    "ts": datetime.now().isoformat(timespec="seconds"), "model": model,
-                    "id": q["id"], "held_out": bool(q.get("held_out")), "ok": ok,
-                    "reason": reason, "sql": sql, "seconds": round(elapsed, 2),
-                }) + "\n")
+                log_result(log, model, q, sql, ok, reason, elapsed)
             summary[model] = (passed, len(questions), secs / max(len(questions), 1))
 
-    print("\nSUMMARY")
-    for model, (p, n, avg) in summary.items():
-        print(f"  {model:<22} {p}/{n} passed   avg {avg:.1f}s per question")
+    print_summary(summary)
 
 
 if __name__ == "__main__":
